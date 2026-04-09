@@ -1,0 +1,12 @@
+name: Vulnerable Supply Chain
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+    - name: Run unverified third party action
+      uses: malicious-actor/unknown-action@master
+    - name: Use hardcoded secret
+      run: echo "Using AWS key AKIAIOSFODNN7EXAMPLE" 

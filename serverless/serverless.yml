@@ -1,0 +1,12 @@
+service: vulnerable-lambda
+provider:
+  name: aws
+  runtime: nodejs18.x
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - "*"
+      Resource: "*"
+functions:
+  vulnHandler:
+    handler: lambda.handler

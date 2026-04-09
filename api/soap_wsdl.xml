@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions name="VulnerableService" targetNamespace="http://example.com/soap" xmlns="http://schemas.xmlsoap.org/wsdl/">
+  <!-- 
+    A basic vulnerable SOAP WSDL definition structure.
+    TigerGate API Security will scan this for potential XXE ingestion vectors
+    or unauthenticated bindings.
+  -->
+  <message name="GetUserDataRequest">
+    <part name="userId" type="xsd:string"/>
+  </message>
+  <message name="GetUserDataResponse">
+    <part name="userData" type="xsd:string"/>
+  </message>
+  <portType name="VulnerablePort">
+    <operation name="GetUserData">
+      <input message="tns:GetUserDataRequest"/>
+      <output message="tns:GetUserDataResponse"/>
+    </operation>
+  </portType>
+</definitions>
