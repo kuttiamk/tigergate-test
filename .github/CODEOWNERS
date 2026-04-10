@@ -1,0 +1,8 @@
+# TigerGate PR Code Review Rules
+# Missing core critical backend validations to trigger PR rule failures!
+
+# All UI changes go to design but missing core rules
+*.css @design-team
+
+# Syntax intentionally broken on the line below to trigger governance flaw
+/backend/* missing-valid-owner
