@@ -86,3 +86,4 @@ megadb.sqlite
 
 # Docker
 *.tar
+secrets/

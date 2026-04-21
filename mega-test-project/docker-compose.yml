@@ -35,7 +35,7 @@ services:
       MYSQL_USER: appuser
       MYSQL_PASSWORD: apppassword123      # BAD: Hardcoded password!
     ports:
-      - "3306:3306"                       # BAD: DB port exposed to host
+      - "3307:3306"                       # BAD: DB port exposed to host
     volumes:
       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
       - mysql_data:/var/lib/mysql
