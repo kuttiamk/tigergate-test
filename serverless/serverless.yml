@@ -1,12 +1,64 @@
-service: vulnerable-lambda
+# =============================================================================
+# serverless/serverless.yml – TigerGate CNAPP Test: Serverless Security
+# =============================================================================
+# PURPOSE: Demonstrates Serverless vulnerabilities (AWS Lambda + API Gateway)
+# TIGERGATE DETECTIONS COVERED:
+#   SV-001: Function has wild-card IAM permissions (CIEM)
+#   SV-002: API Gateway has no authorization configured
+#   SV-003: Function exposes sensitive environment variables (SAST/DSPM)
+#   SV-004: Insecure runtime version (Node.js 14.x is deprecated/EOL)
+#   SV-005: Function does not use a VPC
+# =============================================================================
+
+service: tigergate-insecure-serverless
+
 provider:
   name: aws
-  runtime: nodejs18.x
-  iamRoleStatements:
-    - Effect: Allow
-      Action:
-        - "*"
-      Resource: "*"
+  # 🔴 VULN: EOL Runtime (Node.js 14 is unsupported)
+  runtime: nodejs14.x
+  region: us-east-1
+
+  # 🔴 VULN: Environment variables contain secrets in plain text
+  environment:
+    API_KEY_SECRET: "sk_live_dummykeyformegacorp"
+    DB_PASSWORD: "SuperSecretPassword123"
+
+  iam:
+    role:
+      statements:
+        # 🔴 VULN: CIEM - Wildcard permissions across all S3 buckets and DynamoDB
+        - Effect: "Allow"
+          Action:
+            - "s3:*"
+            - "dynamodb:*"
+          Resource: "*"
+
 functions:
-  vulnHandler:
+  insecureHandler:
     handler: lambda.handler
+    # 🔴 VULN: Timeout too long, easily allows Denial of Wallet attacks
+    timeout: 300 
+    events:
+      - http:
+          path: /execute
+          method: post
+          # 🔴 VULN: API Gateway has no authorizer / auth enabled
+          cors: true
+
+      - http:
+          path: /data
+          method: get
+          # 🔴 VULN: Open REST endpoint
+
+resources:
+  Resources:
+    PublicS3Bucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: tigergate-serverless-bucket-public
+        # 🔴 VULN: Bucket created via serverless framework is public
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: false
+          BlockPublicPolicy: false
+          IgnorePublicAcls: false
+          RestrictPublicBuckets: false
