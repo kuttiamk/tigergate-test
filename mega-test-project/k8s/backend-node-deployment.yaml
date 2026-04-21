@@ -1,0 +1,59 @@
+# =============================================================================
+# k8s/backend-node-deployment.yaml – Node.js Backend K8s Manifest
+# =============================================================================
+# ⚠️  INTENTIONAL ISSUES:
+#   1. BAD: DB_PASS hardcoded in env (not from Kubernetes Secret)
+#   2. BAD: JWT_SECRET hardcoded (not from Secret)
+#   3. BAD: No resource limits
+#   4. BAD: privileged: true — container has root-level host access!
+#   5. BAD: No network policy restricting ingress/egress
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-node
+  namespace: mega-test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend-node
+  template:
+    metadata:
+      labels:
+        app: backend-node
+    spec:
+      containers:
+        - name: backend-node
+          image: mega-test-project-backend-node:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 3000
+          securityContext:
+            privileged: true          # 🔴 BAD: Privileged container! Full host access!
+            runAsUser: 0              # BAD: Running as root (UID 0)
+            allowPrivilegeEscalation: true  # BAD: Can escalate to root
+          env:
+            - name: DB_HOST
+              value: "mysql-svc"
+            - name: DB_USER
+              value: "root"
+            - name: DB_PASS
+              value: "root123"        # 🔴 BAD: Should be from a Kubernetes Secret
+            - name: JWT_SECRET
+              value: "supersecretkey123"   # 🔴 BAD: Should be from a Kubernetes Secret
+          # BAD: No resource limits
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-node-svc
+  namespace: mega-test
+spec:
+  type: NodePort              # BAD: Should use ClusterIP + Ingress
+  selector:
+    app: backend-node
+  ports:
+    - port: 3000
+      targetPort: 3000
+      nodePort: 30002

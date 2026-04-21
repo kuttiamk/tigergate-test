@@ -1,0 +1,60 @@
+# =============================================================================
+# k8s/frontend-deployment.yaml – Frontend Kubernetes Manifest
+# =============================================================================
+# PURPOSE: Deploys the React frontend to Kubernetes.
+#
+# ⚠️  INTENTIONAL ISSUES:
+#   1. BAD: imagePullPolicy: Never (images not pulled from registry)
+#   2. BAD: No resource limits — container can consume all node CPU/RAM
+#   3. BAD: Running as root (no securityContext)
+#   4. BAD: No readiness/liveness probes
+#   5. BAD: VITE_API_URL hardcoded in env (not from ConfigMap/Secret)
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: mega-test
+  labels:
+    app: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      # BAD: No securityContext — runs as root by default
+      containers:
+        - name: frontend
+          image: mega-test-project-frontend:latest
+          imagePullPolicy: Never              # OK for local dev
+          ports:
+            - containerPort: 5173
+          env:
+            - name: VITE_API_URL
+              value: "http://backend-node-svc:3000"   # BAD: Hardcoded, not from ConfigMap
+          # BAD: No resources block — container runs unlimited
+          # resources:                        # MISSING!
+          #   limits:
+          #     cpu: "500m"
+          #     memory: "256Mi"
+          # BAD: No readinessProbe or livenessProbe
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-svc
+  namespace: mega-test
+spec:
+  # BAD: NodePort exposes the service on a random high port on all nodes
+  type: NodePort              # BAD: Should be ClusterIP + Ingress for production
+  selector:
+    app: frontend
+  ports:
+    - port: 5173
+      targetPort: 5173
+      nodePort: 30001         # BAD: Fixed nodePort — port conflicts likely

@@ -1,12 +1,143 @@
 openapi: 3.0.0
 info:
-  title: Vulnerable API
+  title: MegaCorp Internal API
+  description: |
+    # Tigergate CNAPP Test: OpenAPI Misconfigurations
+    API Security Findings:
+    - API-001: PII returned without authentication (GET /users)
+    - API-002: Administrative endpoints exposed without auth
+    - API-003: Mass assignment vulnerabilities (PUT /users/{id})
+    - API-004: Verbose 500 error messages (stack traces in schema)
+    - API-005: Cleartext HTTP schemes allowed
   version: 1.0.0
+servers:
+  - url: http://api.megacorp.internal/v1
+    description: Internal Development Server
+  - url: https://api.megacorp.internal/v1
+    description: Production Server
+tags:
+  - name: Users
+    description: User management operations
+  - name: Admin
+    description: Administrative tools
+
 paths:
-  /users/pii:
+  /users:
     get:
-      summary: Retrieves all PII records
-      # Missing security requirements (No Auth)
+      tags:
+        - Users
+      summary: Get all users
+      description: Returns all users, including PII like SSN and credit card numbers. No security requirements defined!
+      # 🔴 VULN: No security definitions
       responses:
         '200':
-          description: OK
+          description: A list of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+
+  /users/{id}:
+    get:
+      tags:
+        - Users
+      summary: Get a user by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      # 🔴 VULN: IDOR potential + no security definition
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+    put:
+      tags:
+        - Users
+      summary: Update user
+      description: Updates user profile. Mass assignment possible here.
+      # 🔴 VULN: Mass Assignment — accepts 'role' field
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                role:
+                  type: string
+                  description: 🔴 VULN - Users can self-assign admin role!
+      responses:
+        '200':
+          description: User updated
+
+  /admin/stats:
+    get:
+      tags:
+        - Admin
+      summary: Get system statistics
+      description: Returns sensitive DB URLs and API keys.
+      # 🔴 VULN: Admin endpoint completely unauthenticated!
+      responses:
+        '200':
+          description: System stats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dbUrl:
+                    type: string
+                  totalRevenue:
+                    type: number
+
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        email:
+          type: string
+        password:
+          type: string
+          description: 🔴 VULN - Password hash exposed!
+        ssn:
+          type: string
+          description: 🔴 VULN - Social Security Number exposed!
+        creditCardNumber:
+          type: string
+        cvv:
+          type: string
+        role:
+          type: string
+      required:
+        - id
+        - username
+        - email
+
+  securitySchemes:
+    # 🔴 VULN: Security schemes defined but not applied globally or to endpoints
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

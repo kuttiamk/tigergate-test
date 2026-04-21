@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mega-test
+  # BAD: No resource quotas defined for this namespace
+  # BAD: No network policies — all pods can communicate with each other
+---
+# =============================================================================
+# k8s/namespace.yaml – Kubernetes Namespace
+# =============================================================================
+# PURPOSE: Creates the namespace for all mega-test-project workloads.
+#
+# ⚠️  INTENTIONAL ISSUES:
+#   1. BAD: No ResourceQuota — pods can consume unlimited CPU/memory
+#   2. BAD: No NetworkPolicy — all pods can talk to each other freely
+#   3. BAD: No LimitRange — containers can run without CPU/memory limits
+# =============================================================================

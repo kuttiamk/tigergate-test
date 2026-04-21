@@ -1,0 +1,177 @@
+name: CI Pipeline – Multi-Service Build & SonarQube Scan
+
+# =============================================================================
+# .github/workflows/ci.yml – GitHub Actions CI/CD Pipeline
+# =============================================================================
+# PURPOSE: Runs on every push/PR to:
+#   1. Lint and build each service
+#   2. Run SonarQube SAST scan
+#
+# ⚠️  INTENTIONAL ISSUES IN THIS FILE:
+#   1. BAD: Secrets hardcoded in environment block (not using GitHub Secrets)
+#   2. BAD: No caching of Docker layers — slow builds
+#   3. BAD: Pipeline does NOT fail on SonarQube quality gate failure
+#   4. BAD: SONAR_TOKEN is exposed in run commands as a plain arg
+#   5. BAD: Node version matrix misses security patch versions
+# =============================================================================
+
+on:
+  push:
+    branches: ["main", "develop"]
+  pull_request:
+    branches: ["main"]
+
+env:
+  # BAD: Credentials stored directly in workflow file — should use GitHub Secrets
+  # SonarQube: "Credentials should not be hardcoded"
+  DB_PASSWORD: root123                         # BAD: Use ${{ secrets.DB_PASSWORD }}
+  JWT_SECRET: supersecretkey123                # BAD: Use ${{ secrets.JWT_SECRET }}
+  SONAR_HOST_URL: http://localhost:9000        # Fine for demo — but bad if public SonarQube
+
+jobs:
+
+  # ============================================================================
+  # JOB 1: Lint and Build Node.js Backend
+  # ============================================================================
+  build-node:
+    name: Build & Lint Node.js Backend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          # BAD: Fixed to version 16 — EOL, should use node-version-file or '20'
+          node-version: '16'          # BAD: EOL version!
+
+      - name: Install dependencies
+        working-directory: ./backend-node
+        run: npm install              # BAD: Should be npm ci for reproducible installs
+
+      - name: Check for vulnerabilities
+        working-directory: ./backend-node
+        # BAD: audit --audit-level low fails on any vuln, but errors are ignored with || true
+        run: npm audit --audit-level=low || true  # BAD: || true swallows failures!
+
+  # ============================================================================
+  # JOB 2: Lint and Build Frontend
+  # ============================================================================
+  build-frontend:
+    name: Build React Frontend
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install and Build
+        working-directory: ./frontend
+        run: |
+          npm install
+          npm run build
+
+  # ============================================================================
+  # JOB 3: Lint Python Backend
+  # ============================================================================
+  build-python:
+    name: Lint Python Flask Backend
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        working-directory: ./backend-python
+        run: pip install -r requirements.txt
+
+      - name: Safety check (dependency vulnerabilities)
+        working-directory: ./backend-python
+        # BAD: safety check results ignored with || true
+        run: pip install safety && safety check || true  # BAD: Swallowed failure
+
+  # ============================================================================
+  # JOB 4: Build Java Spring Boot
+  # ============================================================================
+  build-java:
+    name: Build Java Spring Boot
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Build with Maven
+        working-directory: ./backend-java
+        # BAD: -DskipTests skips all tests — no test validation in CI!
+        run: mvn package -DskipTests -q  # BAD: Tests skipped!
+
+  # ============================================================================
+  # JOB 5: SonarQube SAST Scan
+  # BAD: Only runs after builds succeed, not in parallel
+  # BAD: Quality gate failure does NOT block merge
+  # ============================================================================
+  sonarqube-scan:
+    name: SonarQube SAST Scan
+    runs-on: ubuntu-latest
+    needs: [build-node, build-frontend, build-python]
+    # BAD: Java build not waited for (missing: build-java)
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Needed for SonarQube blame data
+
+      - name: Run SonarQube Scanner
+        uses: SonarSource/sonarqube-scan-action@master
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        # BAD: No sonar.qualitygate.wait=true — scan completes without checking gate
+
+  # ============================================================================
+  # JOB 6: Docker Build (all services)
+  # BAD: No Docker image scanning (Trivy/Snyk) before push
+  # ============================================================================
+  docker-build:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    needs: [build-node, build-frontend, build-python, build-java]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build all images
+        # BAD: No --no-cache, no image scanning, no push to registry
+        run: docker compose build
+
+      - name: Start services
+        run: |
+          docker compose up -d
+          sleep 30   # BAD: Fixed sleep instead of proper health check wait
+
+      - name: Smoke test Node.js API
+        run: curl -f http://localhost:3000/api/users || echo "Node API failed"  # BAD: || echo hides failure
+
+      - name: Smoke test Python API
+        run: curl -f http://localhost:5000/api/products || echo "Python API failed"  # BAD
+
+      - name: Stop services
+        if: always()
+        run: docker compose down

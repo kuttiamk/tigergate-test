@@ -1,0 +1,88 @@
+# TigerGate CNAPP Target Simulator – .gitignore
+# ============================================================
+# IMPORTANT: This project intentionally contains simulated
+# secrets in plaintext (secrets/, cspm/, ciem/). Those are
+# dummy/test values and are MEANT to be committed for
+# security scanner testing. The real credentials in your
+# environment should NEVER be committed.
+# ============================================================
+
+# Node.js
+node_modules/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+package-lock.json.bak
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+.eggs/
+*.ipynb_checkpoints
+
+# Ruby
+.bundle/
+Gemfile.lock
+*.gem
+
+# Java
+*.class
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+target/
+hs_err_pid*
+
+# Terraform
+.terraform/
+.terraform.lock.hcl
+terraform.tfvars
+terraform.tfstate
+terraform.tfstate.backup
+*.tfplan
+crash.log
+
+# IDE and OS
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+.env.local
+.env.*.local
+
+# Test + Scanner output
+coverage/
+.sonar/
+.scannerwork/
+.checkov/
+reports/
+test-results/
+*.lcov
+*.xml.bak
+
+# Runtime / Logs
+.logs/
+*.pid
+nohup.out
+megadb.sqlite
+
+# Docker
+*.tar

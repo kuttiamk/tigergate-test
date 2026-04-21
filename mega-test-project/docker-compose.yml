@@ -1,0 +1,164 @@
+# =============================================================================
+# docker-compose.yml – Main Orchestration File
+# =============================================================================
+# PURPOSE: Starts ALL services with a single command: docker-compose up
+#
+# SERVICES:
+#   - mysql         (port 3306)  – Database
+#   - frontend      (port 5173)  – React + Vite app
+#   - backend-node  (port 3000)  – Node.js Express API
+#   - backend-python(port 5000)  – Flask API
+#   - backend-java  (port 8080)  – Spring Boot API
+#   - vulnerable-php(port 8888)  – DVWA-style PHP app
+#
+# ⚠️  INTENTIONAL ISSUES IN THIS FILE:
+#   1. BAD: Hardcoded passwords (SonarQube will flag: "Credentials should not be hardcoded")
+#   2. BAD: No resource limits on containers (performance + security risk)
+#   3. BAD: Database port 3306 is exposed to the host (should be internal only)
+# =============================================================================
+
+version: "3.8"
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # MySQL Database
+  # BAD: MYSQL_ROOT_PASSWORD is hardcoded here — SonarQube flags this
+  # BAD: Port 3306 exposed publicly — attacker can connect directly
+  # ---------------------------------------------------------------------------
+  mysql:
+    image: mysql:8.0
+    container_name: mega_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root123        # BAD: Hardcoded password!
+      MYSQL_DATABASE: megadb
+      MYSQL_USER: appuser
+      MYSQL_PASSWORD: apppassword123      # BAD: Hardcoded password!
+    ports:
+      - "3306:3306"                       # BAD: DB port exposed to host
+    volumes:
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - mysql_data:/var/lib/mysql
+    networks:
+      - mega_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot123"]
+      interval: 10s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # React + Vite Frontend
+  # BAD: No Content-Security-Policy headers
+  # ---------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: mega_frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:3000   # BAD: Hardcoded API URL
+    depends_on:
+      - backend-node
+    networks:
+      - mega_network
+
+  # ---------------------------------------------------------------------------
+  # Node.js Express Backend
+  # BAD: DB credentials passed as plain environment variables
+  # ---------------------------------------------------------------------------
+  backend-node:
+    build:
+      context: ./backend-node
+      dockerfile: Dockerfile
+    container_name: mega_node
+    ports:
+      - "3000:3000"
+    environment:
+      DB_HOST: mysql
+      DB_USER: root
+      DB_PASS: root123                    # BAD: Hardcoded password!
+      DB_NAME: megadb
+      JWT_SECRET: supersecretkey123       # BAD: Hardcoded JWT secret!
+      NODE_ENV: development
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - mega_network
+
+  # ---------------------------------------------------------------------------
+  # Python Flask Backend
+  # BAD: Debug mode enabled in production-like container
+  # ---------------------------------------------------------------------------
+  backend-python:
+    build:
+      context: ./backend-python
+      dockerfile: Dockerfile
+    container_name: mega_python
+    ports:
+      - "5000:5000"
+    environment:
+      DB_HOST: mysql
+      DB_USER: root
+      DB_PASS: root123                    # BAD: Hardcoded password!
+      DB_NAME: megadb
+      SECRET_KEY: flask_secret_key_1234   # BAD: Hardcoded Flask secret!
+      FLASK_DEBUG: "1"                    # BAD: Debug enabled!
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - mega_network
+
+  # ---------------------------------------------------------------------------
+  # Java Spring Boot Backend
+  # BAD: application properties could be in env — hardcoded here instead
+  # ---------------------------------------------------------------------------
+  backend-java:
+    build:
+      context: ./backend-java
+      dockerfile: Dockerfile
+    container_name: mega_java
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/megadb
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root123  # BAD: Hardcoded password!
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - mega_network
+
+  # ---------------------------------------------------------------------------
+  # Vulnerable PHP Application (DVWA-style)
+  # BAD: Runs as root inside container
+  # BAD: register_globals style vulnerabilities in code
+  # ---------------------------------------------------------------------------
+  vulnerable-php:
+    build:
+      context: ./vulnerable-php
+      dockerfile: Dockerfile
+    container_name: mega_php
+    ports:
+      - "8888:80"
+    environment:
+      DB_HOST: mysql
+      DB_USER: root
+      DB_PASS: root123                    # BAD: Hardcoded password!
+      DB_NAME: megadb
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - mega_network
+
+volumes:
+  mysql_data:
+
+networks:
+  mega_network:
+    driver: bridge

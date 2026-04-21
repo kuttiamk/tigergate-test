@@ -1,0 +1,52 @@
+/* =============================================================================
+   frontend/src/index.css – Global Styles
+   Very basic styles — no CSS reset, no accessibility focus styles
+   ============================================================================= */
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #1a1a2e;
+  color: #eee;
+}
+
+.app { max-width: 1100px; margin: 0 auto; padding: 20px; }
+
+nav { display: flex; gap: 16px; background: #16213e; padding: 12px 20px; border-radius: 8px; margin-bottom: 24px; }
+nav a { color: #e94560; text-decoration: none; font-weight: bold; }
+nav a:hover { text-decoration: underline; }
+
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 10px 14px; border: 1px solid #333; text-align: left; }
+th { background: #16213e; }
+
+button {
+  background: #e94560;
+  color: white;
+  border: none;
+  padding: 8px 18px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+button:hover { background: #c73652; }
+
+input, textarea {
+  width: 100%;
+  padding: 8px;
+  background: #16213e;
+  border: 1px solid #444;
+  border-radius: 4px;
+  color: #eee;
+  margin-bottom: 10px;
+  box-sizing: border-box;
+}
+
+.card {
+  background: #16213e;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.error { color: #ff6b6b; }
+.success { color: #a8ff78; }

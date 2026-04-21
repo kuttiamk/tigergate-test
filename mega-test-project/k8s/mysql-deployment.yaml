@@ -1,0 +1,58 @@
+# =============================================================================
+# k8s/mysql-deployment.yaml – MySQL Database K8s Manifest
+# =============================================================================
+# ⚠️  INTENTIONAL ISSUES:
+#   1. BAD: MYSQL_ROOT_PASSWORD hardcoded — should be a Kubernetes Secret
+#   2. BAD: No PersistentVolumeClaim — data lost when pod restarts!
+#   3. BAD: Port 3306 exposed via NodePort — DB accessible from outside cluster
+#   4. BAD: No backup strategy
+#   5. BAD: Single replica MySQL (no HA)
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+  namespace: mega-test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.0
+          ports:
+            - containerPort: 3306
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              value: "root123"        # 🔴 BAD: Hardcoded! Use Secret:
+                                      # valueFrom:
+                                      #   secretKeyRef:
+                                      #     name: mysql-secret
+                                      #     key: root-password
+            - name: MYSQL_DATABASE
+              value: "megadb"
+          # BAD: No volumeMounts — all data is ephemeral!
+          # If the pod restarts, ALL DATA IS LOST!
+          # Should mount a PersistentVolumeClaim
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-svc
+  namespace: mega-test
+spec:
+  # BAD: NodePort exposes DB port to outside the cluster!
+  # Should be ClusterIP (internal only)
+  type: NodePort              # BAD!
+  selector:
+    app: mysql
+  ports:
+    - port: 3306
+      targetPort: 3306
+      nodePort: 30006         # BAD: DB accessible from outside the cluster!
