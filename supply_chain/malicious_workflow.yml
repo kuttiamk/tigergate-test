@@ -1,0 +1,81 @@
+# =============================================================================
+# supply_chain/malicious_workflow.yml – TigerGate CNAPP: Supply Chain Security
+# =============================================================================
+# PURPOSE: Demonstrates GitHub Actions supply chain attack vectors.
+# Simulates the SolarWinds/XZ Utils/Codecov style of supply chain compromise.
+#
+# SUPPLY CHAIN FINDINGS:
+#   SC-001: Unpinned third-party actions (tag-based, not SHA-pinned)
+#   SC-002: self-hosted runner with persistent environment
+#   SC-003: GITHUB_TOKEN with excessive permissions passed to untrusted step
+#   SC-004: Pull request from fork triggers secrets exposure
+#   SC-005: Typosquatted action name (actions/check0ut vs actions/checkout)
+#   SC-006: Environment variables leak secrets to all child processes
+# =============================================================================
+
+name: "Supply Chain Attack Simulation"
+
+on:
+  pull_request:             # 🔴 SC-004: Triggers on fork PRs — untrusted code!
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main, develop]
+
+# 🔴 SC-003: Over-permissioned GITHUB_TOKEN grants CI write access to all repos
+permissions:
+  id-token: write
+  contents: write
+  packages: write
+  pull-requests: write
+  issues: write
+  actions: write
+  secrets: write      # 🔴 SC-003: CI pipeline can exfiltrate ALL repo secrets!
+
+env:
+  # 🔴 SC-006: Secrets visible to ALL steps including untrusted third-party actions
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  DATABASE_URL: ${{ secrets.DATABASE_URL }}
+  STRIPE_SECRET: ${{ secrets.STRIPE_SECRET }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 🔴 SC-001: Not pinned to a SHA — any update to @v3 tag is auto-adopted
+      - uses: actions/checkout@v3
+        name: "Checkout (unpinned)"
+
+      # 🔴 SC-005: Typosquatted action — 'actions/setup-nodde' instead of 'actions/setup-node'
+      # A real attacker would publish malicious 'actions/setup-nodde' to GitHub Marketplace
+      - uses: actions/setup-node@v3     # Correct but unpinned
+
+      # 🔴 SC-001: Unverified community action at mutable @latest tag
+      - name: "Run vulnerability scan (unverified action)"
+        uses: unverified-community/vuln-scanner@latest    # 🔴 Not audited, not pinned!
+
+      # 🔴 SC-002: Runs on self-hosted runner — persistent environment retains secrets
+      - name: "Deploy to staging"
+        # runs-on: self-hosted   # If enabled: malicious code persists between runs!
+        run: |
+          # 🔴 SC-006: All parent env vars including secrets visible here
+          echo "Deploying... AWS_KEY=$AWS_ACCESS_KEY_ID"  # 🔴 Logs secret to build output!
+
+      # 🔴 SC-004: This step runs on PRs from forks — untrusted PR code triggers with repo secrets
+      - name: "Run PR integration tests"
+        if: github.event_name == 'pull_request'
+        run: |
+          # 🔴 SC-004: pull_request_target would be even worse — runs with write access!
+          npm test   # Attacker's package.json scripts execute here with all env vars
+
+  # 🔴 SC-002: Self-hosted runner job (persistent attack surface)
+  deploy-production:
+    needs: build
+    runs-on: [self-hosted, linux, production]  # 🔴 SC-002: Persistent runner = malware persistence
+    steps:
+      - name: Deploy
+        run: |
+          # 🔴 SC-002: Self-hosted runner caches credentials across job runs
+          # Previous job artifacts (including secrets) may still be on disk
+          kubectl apply -f k8s/   # Deploys to production without approval gate

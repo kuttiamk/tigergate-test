@@ -1,0 +1,202 @@
+---
+# =============================================================================
+# devsecops/shift_left_pipeline.yml – TigerGate CNAPP: DevSecOps
+# =============================================================================
+# PURPOSE: Demonstrates a COMPLETE DevSecOps "shift-left" CI/CD pipeline with
+# SAST, SCA, Secrets Scanning, IaC scanning, Container scanning, and DAST.
+# This is the "gold standard" DevSecOps pipeline for CNAPP testing.
+#
+# PIPELINE STAGES:
+#   1. Secrets Detection (Gitleaks — pre-build gate)
+#   2. SAST (SonarQube + Semgrep)
+#   3. SCA / SBOM (Trivy fs + CycloneDX SBOM generation)
+#   4. IaC Security (Checkov + tfsec)
+#   5. Container Security (Trivy image + Hadolint)
+#   6. DAST (OWASP ZAP against staging)
+#   7. Compliance Report Generation
+#
+# NOTE: This DevSecOps pipeline is SECURE by design — it shows the contrast
+# to the insecure insecure-ci.yml. Each stage has explicit break-on-fail logic.
+#
+# 🔴 INTENTIONAL FINDINGS: Detecting that this file calls scanners on INTENTIONALLY
+# insecure code. All scanner runs will produce HIGH/CRITICAL findings by design.
+# =============================================================================
+
+name: "🔐 DevSecOps Shift-Left Pipeline"
+
+on:
+  push:
+    branches: [main, develop, "feature/*"]
+  pull_request:
+    branches: [main]
+
+# Explicit minimal permissions (contrast to insecure-ci.yml)
+permissions:
+  contents: read
+  pull-requests: write   # Allow PR comments with scan results
+  security-events: write # Allow SARIF upload to GitHub Security tab
+
+jobs:
+
+  # ── STAGE 1: Secrets Detection ─────────────────────────────────────────────
+  secrets-scan:
+    name: "1/7 Secrets Detection (Gitleaks)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # Full history for better secret detection
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+        # Will FAIL if secrets found in tigergate-test (intentional)
+
+  # ── STAGE 2: SAST ──────────────────────────────────────────────────────────
+  sast:
+    name: "2/7 SAST (SonarQube + Semgrep)"
+    runs-on: ubuntu-latest
+    needs: secrets-scan
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Semgrep SAST
+        uses: semgrep/semgrep-action@v1
+        with:
+          config: >-
+            p/owasp-top-ten
+            p/python
+            p/javascript
+            p/java
+          generateSarif: "1"
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+
+      - name: Upload Semgrep SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep.sarif
+
+  # ── STAGE 3: SCA & SBOM ────────────────────────────────────────────────────
+  sca-sbom:
+    name: "3/7 SCA & SBOM Generation (Trivy)"
+    runs-on: ubuntu-latest
+    needs: secrets-scan
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Trivy filesystem SCA
+        uses: aquasecurity/trivy-action@0.19.0
+        with:
+          scan-type: fs
+          scan-ref: "."
+          format: cyclonedx
+          output: sbom.cdx.json
+          severity: HIGH,CRITICAL
+          exit-code: 0   # Don't fail — report only (has intentional vulns)
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-report
+          path: sbom.cdx.json
+
+  # ── STAGE 4: IaC Security ──────────────────────────────────────────────────
+  iac-scan:
+    name: "4/7 IaC Security (Checkov + tfsec)"
+    runs-on: ubuntu-latest
+    needs: secrets-scan
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkov IaC Scan
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: .
+          framework: terraform,cloudformation,kubernetes
+          output_format: sarif
+          output_file_path: checkov.sarif
+          soft_fail: true   # Report only (intentional misconfigs expected)
+
+      - name: Upload Checkov SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: checkov.sarif
+
+  # ── STAGE 5: Container Security ────────────────────────────────────────────
+  container-scan:
+    name: "5/7 Container Security (Trivy + Hadolint)"
+    runs-on: ubuntu-latest
+    needs: sca-sbom
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lint all Dockerfiles
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          recursive: true
+          failure-threshold: warning
+
+      - name: Build test image
+        run: docker build -t tigergate-test:${{ github.sha }} -f docker/Dockerfile.insecure .
+        continue-on-error: true
+
+      - name: Scan container image
+        uses: aquasecurity/trivy-action@0.19.0
+        with:
+          image-ref: tigergate-test:${{ github.sha }}
+          format: sarif
+          output: trivy-container.sarif
+          severity: HIGH,CRITICAL
+          exit-code: 0
+
+  # ── STAGE 6: DAST ──────────────────────────────────────────────────────────
+  dast:
+    name: "6/7 DAST (OWASP ZAP)"
+    runs-on: ubuntu-latest
+    needs: [sast, iac-scan]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start test application
+        run: docker compose up -d --build
+        working-directory: mega-test-project
+        continue-on-error: true
+
+      - name: OWASP ZAP Baseline Scan
+        uses: zaproxy/action-baseline@v0.12.0
+        with:
+          target: http://localhost:3000
+          rules_file_name: .zap/rules.tsv
+          fail_action: false   # Report only (intentional DAST findings expected)
+
+  # ── STAGE 7: Compliance Report ─────────────────────────────────────────────
+  compliance-report:
+    name: "7/7 Compliance Report Generation"
+    runs-on: ubuntu-latest
+    needs: [sca-sbom, iac-scan, container-scan]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate compliance summary
+        run: |
+          echo "# TigerGate Compliance Scan Report" > compliance-report.md
+          echo "**Date**: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> compliance-report.md
+          echo "**Commit**: ${{ github.sha }}" >> compliance-report.md
+          echo "" >> compliance-report.md
+          echo "| Framework | Status | Notes |" >> compliance-report.md
+          echo "|-----------|--------|-------|" >> compliance-report.md
+          echo "| PCI-DSS v4.0 | ❌ FAIL | Intentional violations in industry/fintech/ |" >> compliance-report.md
+          echo "| HIPAA Security Rule | ❌ FAIL | Intentional violations in industry/healthcare/ |" >> compliance-report.md
+          echo "| FedRAMP Moderate | ❌ FAIL | Intentional violations in industry/government/ |" >> compliance-report.md
+          echo "| CIS AWS v1.5.0 | ❌ FAIL | Intentional violations in cspm/aws_insecure.tf |" >> compliance-report.md
+          echo "| SOC 2 Type II | ❌ FAIL | CC6/CC7 violations across codebase |" >> compliance-report.md
+          cat compliance-report.md
+
+      - name: Upload compliance report
+        uses: actions/upload-artifact@v4
+        with:
+          name: compliance-report
+          path: compliance-report.md

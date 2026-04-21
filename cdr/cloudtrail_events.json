@@ -1,0 +1,150 @@
+{
+    "_comment": "TigerGate CNAPP – CDR: Simulated CloudTrail/GuardDuty Finding Events",
+    "_purpose": "This JSON file simulates the structure of real AWS GuardDuty findings and CloudTrail events. CNAPP platforms ingest these for CDR correlation and attack path reconstruction.",
+    "_detections": [
+        "CDR-001: Unusual console login (TOR exit node)",
+        "CDR-002: Mass IAM enumeration in 90 seconds",
+        "CDR-003: Large-scale S3 object read (data exfil pattern)",
+        "CDR-004: CloudTrail logging stopped (defense evasion)",
+        "CDR-005: Multi-hop role assumption chain (privilege escalation)"
+    ],
+    "findings": [
+        {
+            "id": "CDR-f001",
+            "type": "UnauthorizedAccess:IAMUser/ConsoleLoginSuccess.B",
+            "severity": 8.0,
+            "region": "eu-west-3",
+            "accountId": "123456789012",
+            "resource": {
+                "type": "AccessKey",
+                "resource_id": "AKIAIOSFODNN7EXAMPLE"
+            },
+            "service": {
+                "action": {
+                    "actionType": "NETWORK_CONNECTION",
+                    "networkConnectionAction": {
+                        "remoteIpDetails": {
+                            "ipAddressV4": "195.206.105.217",
+                            "organization": {
+                                "asn": "39351",
+                                "asnOrg": "Mullvad VPN"
+                            },
+                            "country": {
+                                "countryName": "Sweden"
+                            },
+                            "city": {
+                                "cityName": "Stockholm"
+                            }
+                        }
+                    }
+                },
+                "count": 1
+            },
+            "title": "API call made from a known Tor exit node IP address",
+            "description": "AWS APIs were invoked from a known Tor exit node IP 195.206.105.217. This may indicate the caller is hiding their true identity. Compromised credentials used from TOR.",
+            "createdAt": "2026-04-21T11:03:22Z",
+            "updatedAt": "2026-04-21T11:03:22Z"
+        },
+        {
+            "id": "CDR-f002",
+            "type": "Discovery:IAMUser/AnomalousBehavior",
+            "severity": 7.0,
+            "region": "us-east-1",
+            "accountId": "123456789012",
+            "resource": {
+                "type": "AccessKey",
+                "resource_id": "AKIAIOSFODNN7EXAMPLE"
+            },
+            "cloudTrailEvents": [
+                {
+                    "eventName": "ListUsers",
+                    "count": 1
+                },
+                {
+                    "eventName": "ListRoles",
+                    "count": 1
+                },
+                {
+                    "eventName": "ListPolicies",
+                    "count": 12
+                },
+                {
+                    "eventName": "GetUser",
+                    "count": 23
+                },
+                {
+                    "eventName": "ListGroupsForUser",
+                    "count": 10
+                }
+            ],
+            "title": "47 IAM enumeration API calls in 90 seconds",
+            "description": "The IAM user made an unusual number of API calls typically associated with discovery activity. 47 calls in 90 seconds — 940% above baseline.",
+            "createdAt": "2026-04-21T11:04:10Z",
+            "mitre_tactic": "TA0007:Discovery",
+            "mitre_technique": "T1069.003:Cloud Groups"
+        },
+        {
+            "id": "CDR-f003",
+            "type": "Exfiltration:S3/ObjectRead.Unusual",
+            "severity": 9.0,
+            "region": "us-east-1",
+            "accountId": "123456789012",
+            "resource": {
+                "type": "S3Bucket",
+                "s3BucketDetails": [
+                    {
+                        "name": "megacorp-pii-data-prod",
+                        "type": "Destination"
+                    }
+                ]
+            },
+            "title": "1,247 S3 objects (4.7 GB) read in 8 minutes — exfiltration pattern",
+            "description": "The principal read 1,247 S3 objects (4.7 GB) from bucket megacorp-pii-data-prod within 8 minutes — a 10,000% deviation from the 30-day baseline of 2 objects/day. Data was subsequently copied to an external bucket.",
+            "createdAt": "2026-04-21T11:07:44Z",
+            "mitre_tactic": "TA0010:Exfiltration",
+            "mitre_technique": "T1530:Data from Cloud Storage Object"
+        },
+        {
+            "id": "CDR-f004",
+            "type": "Stealth:IAMUser/CloudTrailLoggingDisabled",
+            "severity": 9.5,
+            "region": "us-east-1",
+            "accountId": "123456789012",
+            "title": "CloudTrail trail stopped — attacker entering 'dark period'",
+            "description": "The IAM user stopped the CloudTrail trail 'main'. All subsequent API activity will be unlogged. This is a critical defense evasion indicator.",
+            "apiCalls": [
+                "cloudtrail:StopLogging",
+                "guardduty:UpdateDetector (enable=false)",
+                "cloudwatch:DeleteAlarms"
+            ],
+            "createdAt": "2026-04-21T11:12:01Z",
+            "mitre_tactic": "TA0005:Defense Evasion",
+            "mitre_technique": "T1562.008:Disable Cloud Logs"
+        },
+        {
+            "id": "CDR-f005",
+            "type": "PrivilegeEscalation:IAMUser/AnomalousBehavior",
+            "severity": 10.0,
+            "region": "us-east-1",
+            "accountId": "123456789012",
+            "title": "Multi-hop role assumption leading to AdministratorAccess",
+            "description": "A low-privilege IAM user chained three sts:AssumeRole calls to ultimately gain AdministratorAccess. A backdoor admin user was then created.",
+            "roleChain": [
+                "arn:aws:iam::123456789012:role/dev-deployment-role",
+                "arn:aws:iam::123456789012:role/ci-cd-pipeline-role",
+                "iam:CreateUser → backdoor_admin",
+                "iam:AttachUserPolicy → AdministratorAccess"
+            ],
+            "createdAt": "2026-04-21T11:15:33Z",
+            "mitre_tactic": "TA0004:Privilege Escalation",
+            "mitre_technique": "T1078.004:Valid Accounts: Cloud Accounts"
+        }
+    ],
+    "summary": {
+        "totalFindings": 5,
+        "critical": 2,
+        "high": 3,
+        "timeToDetect": "PT8M31S",
+        "attackSequence": "Initial Access → Discovery → Collection → Exfiltration → Defense Evasion → Privilege Escalation"
+    }
+}
