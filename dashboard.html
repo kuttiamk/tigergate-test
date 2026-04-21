@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TigerGate CNAPP – Security Coverage Dashboard</title>
+    <meta name="description"
+        content="Interactive vulnerability coverage dashboard for the TigerGate CNAPP testing suite, showing real-time pillar coverage and detection mapping." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap"
+        rel="stylesheet" />
+    <style>
+        :root {
+            --bg: #030507;
+            --surface: rgba(255, 255, 255, 0.03);
+            --surface-hover: rgba(255, 255, 255, 0.06);
+            --border: rgba(255, 255, 255, 0.06);
+            --cyan: #00f0ff;
+            --purple: #8a2be2;
+            --green: #00ffaa;
+            --red: #ff3366;
+            --yellow: #ffd600;
+            --orange: #ff8c00;
+            --text: #e8eaf0;
+            --muted: #6b7a99;
+            --font: 'Outfit', sans-serif;
+            --mono: 'JetBrains Mono', monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font);
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Animated background */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background:
+                radial-gradient(circle at 15% 15%, rgba(138, 43, 226, 0.12) 0%, transparent 40%),
+                radial-gradient(circle at 85% 80%, rgba(0, 240, 255, 0.08) 0%, transparent 40%);
+            z-index: -1;
+            animation: bgPulse 8s ease-in-out infinite alternate;
+        }
+
+        @keyframes bgPulse {
+            to {
+                opacity: 0.6;
+            }
+        }
+
+        /* Grid canvas background */
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(0, 240, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 240, 255, 0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+            z-index: -1;
+        }
+
+        /* ── Layout ── */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px 24px;
+        }
+
+        /* ── Header ── */
+        header {
+            text-align: center;
+            padding: 60px 0 50px;
+        }
+
+        .logo-line {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: var(--cyan);
+            opacity: 0.7;
+            margin-bottom: 24px;
+        }
+
+        .logo-line::before,
+        .logo-line::after {
+            content: '';
+            width: 40px;
+            height: 1px;
+            background: var(--cyan);
+            opacity: 0.4;
+        }
+
+        h1 {
+            font-size: clamp(2.5rem, 6vw, 4.5rem);
+            font-weight: 800;
+            letter-spacing: -2px;
+            background: linear-gradient(135deg, #fff 30%, #6b7a99 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            line-height: 1.1;
+            margin-bottom: 16px;
+        }
+
+        .subtitle {
+            font-size: 1.15rem;
+            color: var(--muted);
+            max-width: 560px;
+            margin: 0 auto 40px;
+            line-height: 1.6;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0, 255, 170, 0.08);
+            border: 1px solid rgba(0, 255, 170, 0.2);
+            border-radius: 100px;
+            padding: 8px 20px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--green);
+            letter-spacing: 0.5px;
+            animation: pulseGlow 2s ease-in-out infinite;
+        }
+
+        @keyframes pulseGlow {
+
+            0%,
+            100% {
+                box-shadow: 0 0 10px rgba(0, 255, 170, 0.1);
+            }
+
+            50% {
+                box-shadow: 0 0 20px rgba(0, 255, 170, 0.25);
+            }
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--green);
+            animation: blink 1.5s infinite;
+        }
+
+        @keyframes blink {
+            50% {
+                opacity: 0.2;
+            }
+        }
+
+        /* ── KPI Cards ── */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 50px 0;
+        }
+
+        .kpi {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 28px 24px;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .kpi::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--kpi-color, var(--cyan));
+            opacity: 0.7;
+        }
+
+        .kpi:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .kpi-label {
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--muted);
+            margin-bottom: 12px;
+        }
+
+        .kpi-value {
+            font-size: 2.8rem;
+            font-weight: 800;
+            font-family: var(--mono);
+            color: var(--kpi-color, var(--cyan));
+            line-height: 1;
+        }
+
+        .kpi-sub {
+            font-size: 0.8rem;
+            color: var(--muted);
+            margin-top: 8px;
+        }
+
+        /* ── Section Title ── */
+        .section-title {
+            font-size: 1.6rem;
+            font-weight: 700;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: #fff;
+        }
+
+        .section-title::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+        }
+
+        /* ── Pillar Grid ── */
+        .pillar-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 50px;
+        }
+
+        .pillar-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            transition: all 0.3s;
+            cursor: default;
+        }
+
+        .pillar-card:hover {
+            background: var(--surface-hover);
+            border-color: rgba(255, 255, 255, 0.12);
+            transform: translateY(-2px);
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .pillar-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .pillar-name {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 700;
+            font-size: 1rem;
+        }
+
+        .pillar-icon {
+            font-size: 1.4rem;
+        }
+
+        .pillar-count {
+            font-family: var(--mono);
+            font-size: 0.85rem;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 8px;
+        }
+
+        .pillar-files {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .pillar-file {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            font-size: 0.82rem;
+        }
+
+        .file-name {
+            font-family: var(--mono);
+            color: var(--cyan);
+            opacity: 0.8;
+        }
+
+        .file-tag {
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .progress-bar {
+            height: 4px;
+            border-radius: 2px;
+            background: rgba(255, 255, 255, 0.06);
+            margin-top: 16px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: 2px;
+            background: var(--fill-color, var(--cyan));
+            transition: width 1.5s cubic-bezier(0.16, 1, 0.3, 1);
+            width: 0;
+        }
+
+        /* ── Vulnerability Table ── */
+        .vuln-table-wrap {
+            overflow-x: auto;
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            margin-bottom: 50px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead th {
+            background: rgba(255, 255, 255, 0.02);
+            padding: 14px 20px;
+            text-align: left;
+            font-size: 0.78rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--muted);
+            border-bottom: 1px solid var(--border);
+        }
+
+        tbody td {
+            padding: 14px 20px;
+            font-size: 0.88rem;
+            border-bottom: 1px solid var(--border);
+            vertical-align: middle;
+        }
+
+        tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        tbody tr:hover td {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .mono {
+            font-family: var(--mono);
+            font-size: 0.82rem;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 3px 9px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-critical {
+            background: rgba(255, 51, 102, 0.15);
+            color: var(--red);
+            border: 1px solid rgba(255, 51, 102, 0.3);
+        }
+
+        .badge-high {
+            background: rgba(255, 140, 0, 0.15);
+            color: var(--orange);
+            border: 1px solid rgba(255, 140, 0, 0.3);
+        }
+
+        .badge-medium {
+            background: rgba(255, 214, 0, 0.15);
+            color: var(--yellow);
+            border: 1px solid rgba(255, 214, 0, 0.3);
+        }
+
+        .badge-info {
+            background: rgba(0, 240, 255, 0.1);
+            color: var(--cyan);
+            border: 1px solid rgba(0, 240, 255, 0.2);
+        }
+
+        /* ── Footer ── */
+        footer {
+            text-align: center;
+            padding: 40px 0;
+            color: var(--muted);
+            font-size: 0.85rem;
+            border-top: 1px solid var(--border);
+            margin-top: 60px;
+        }
+
+        footer a {
+            color: var(--cyan);
+            text-decoration: none;
+        }
+
+        /* ── Animations ── */
+        .fade-in {
+            opacity: 0;
+            transform: translateY(20px);
+            animation: fadeUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        @keyframes fadeUp {
+            to {
+                opacity: 1;
+                transform: none;
+            }
+        }
+
+        .delay-1 {
+            animation-delay: 0.1s;
+        }
+
+        .delay-2 {
+            animation-delay: 0.2s;
+        }
+
+        .delay-3 {
+            animation-delay: 0.3s;
+        }
+
+        .delay-4 {
+            animation-delay: 0.4s;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+
+        <!-- Header -->
+        <header class="fade-in">
+            <div class="logo-line">TigerGate CNAPP Target Simulator</div>
+            <h1>Security Coverage<br>Dashboard</h1>
+            <p class="subtitle">Comprehensive, intentionally vulnerable monorepo for validating CNAPP platform detection
+                capabilities across all security pillars.</p>
+            <div class="status-badge"><span class="dot"></span> 1,051 Vulnerability Markers Active</div>
+        </header>
+
+        <!-- KPI Cards -->
+        <div class="kpi-grid">
+            <div class="kpi fade-in delay-1" style="--kpi-color: var(--red)">
+                <div class="kpi-label">Vulnerability Markers</div>
+                <div class="kpi-value" id="kpi-vulns">0</div>
+                <div class="kpi-sub">Across all files and pillars</div>
+            </div>
+            <div class="kpi fade-in delay-2" style="--kpi-color: var(--cyan)">
+                <div class="kpi-label">Security Pillars</div>
+                <div class="kpi-value" id="kpi-pillars">0</div>
+                <div class="kpi-sub">CSPM, CIEM, CWPP, KSPM, AI-SPM…</div>
+            </div>
+            <div class="kpi fade-in delay-3" style="--kpi-color: var(--purple)">
+                <div class="kpi-label">Languages Covered</div>
+                <div class="kpi-value" id="kpi-langs">0</div>
+                <div class="kpi-sub">JS, Python, PHP, Ruby, Java, Bash</div>
+            </div>
+            <div class="kpi fade-in delay-4" style="--kpi-color: var(--green)">
+                <div class="kpi-label">Cloud Providers</div>
+                <div class="kpi-value" id="kpi-clouds">0</div>
+                <div class="kpi-sub">AWS, Azure, GCP, Oracle</div>
+            </div>
+            <div class="kpi fade-in delay-2" style="--kpi-color: var(--yellow)">
+                <div class="kpi-label">CWE References</div>
+                <div class="kpi-value" id="kpi-cwe">0</div>
+                <div class="kpi-sub">Mapped to OWASP and NIST</div>
+            </div>
+            <div class="kpi fade-in delay-3" style="--kpi-color: var(--orange)">
+                <div class="kpi-label">Source Files</div>
+                <div class="kpi-value" id="kpi-files">0</div>
+                <div class="kpi-sub">IaC, App, Runtime, API</div>
+            </div>
+        </div>
+
+        <!-- Pillar Coverage -->
+        <div class="section-title fade-in">🛡️ CNAPP Pillar Coverage</div>
+        <div class="pillar-grid fade-in">
+
+            <div class="pillar-card">
+                <div class="pillar-header">
+                    <div class="pillar-name"><span class="pillar-icon">☁️</span> CSPM</div>
+                    <span class="pillar-count badge badge-critical">4 files</span>
+                </div>
+                <div class="pillar-files">
+                    <div class="pillar-file"><span class="file-name">aws_insecure.tf</span><span
+                            class="file-tag badge badge-critical">CIS AWS</span></div>
+                    <div class="pillar-file"><span class="file-name">azure_insecure.tf</span><span
+                            class="file-tag badge badge-high">CIS Azure</span></div>
+                    <div class="pillar-file"><span class="file-name">gcp_insecure.tf</span><span
+                            class="file-tag badge badge-high">CIS GCP</span></div>
+                    <div class="pillar-file"><span class="file-name">oracle_insecure.tf</span><span
+                            class="file-tag badge badge-medium">CIS OCI</span></div>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="--fill-color:var(--red)" data-width="95"></div>
+                </div>
+            </div>
+
+            <div class="pillar-card">
+                <div class="pillar-header">
+                    <div class="pillar-name"><span class="pillar-icon">🔑</span> CIEM</div>
+                    <span class="pillar-count badge badge-critical">3 files</span>
+                </div>
+                <div class="pillar-files">
+                    <div class="pillar-file"><span class="file-name">overly_permissive_iam.tf</span><span
+                            class="file-tag badge badge-critical">Action:*</span></div>
+                    <div class="pillar-file"><span class="file-name">cross_account.tf</span><span
+                            class="file-tag badge badge-critical">Principal:*</span></div>
+                    <div class="pillar-file"><span class="file-name">gcp_ciem.tf</span><span
+                            class="file-tag badge badge-high">roles/owner</span></div>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="--fill-color:var(--orange)" data-width="90"></div>
+                </div>
+            </div>
+
+            <div class="pillar-card">
+                <div class="pillar-header">
+                    <div class="pillar-name"><span class="pillar-icon">🐳</span> CWPP</div>
+                    <span class="pillar-count badge badge-high">2 files</span>
+                </div>
+                <div class="pillar-files">
+                    <div class="pillar-file"><span class="file-name">runtime_attack_advanced.sh</span><span
+                            class="file-tag badge badge-critical">T001–T005</span></div>
+                    <div class="pillar-file"><span class="file-name">Dockerfile.insecure</span><span
+                            class="file-tag badge badge-high">CIS Docker</span></div>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="--fill-color:var(--cyan)" data-width="80"></div>
+                </div>
+            </div>
+
+            <div class="pillar-card">
+                <div class="pillar-header">
+                    <div class="pillar-name"><span class="pillar-icon">⚓</span> KSPM</div>
+                    <span class="pillar-count badge badge-high">1 file</span>
+                </div>
+                <div class="pillar-files">
+                    <div class="pillar-file"><span class="file-name">vulnerable_deployment.yaml</span><span
+                            class="file-tag badge badge-critical">privileged</span></div>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="--fill-color:var(--purple)" data-width="75"></div>
+                </div>
+            </div>
+
+            <div class="pillar-card">
+                <div class="pillar-header">
+                    <div class="pillar-name"><span class="pillar-icon">🤖</span> AI-SPM</div>
+                    <span class="pillar-count badge badge-high">2 files</span>
+                </div>
+                <div class="pillar-files">
+                    <div class="pillar-file"><span class="file-name">llm_app.py</span><span
+                            class="file-tag badge badge-critical">Prompt Inj.</span></div>
+                    <div class="pillar-file"><span class="file-name">huggingface_sagemaker.tf</span><span
+                            class="file-tag badge badge-high">ML01–ML03</span></div>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="--fill-color:var(--cyan)" data-width="70"></div>
+                </div>
+            </div>
+
+            <div class="pillar-card">
+                <div class="pillar-header">
+                    <div class="pillar-name"><span class="pillar-icon">🗄️</span> DSPM</div>
+                    <span class="pillar-count badge badge-high">2 files</span>
+                </div>
+                <div class="pillar-files">
+                    <div class="pillar-file"><span class="file-name">pii_phi_data.sql</span><span
+                            class="file-tag badge badge-critical">HIPAA/PCI</span></div>
+                    <div class="pillar-file"><span class="file-name">pii_exposure.tf</span><span
+                            class="file-tag badge badge-high">GDPR</span></div>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="--fill-color:var(--yellow)" data-width="80"></div>
+                </div>
+            </div>
+
+            <div class="pillar-card">
+                <div class="pillar-header">
+                    <div class="pillar-name"><span class="pillar-icon">📦</span> SCA</div>
+                    <span class="pillar-count badge badge-high">3 files</span>
+                </div>
+                <div class="pillar-files">
+                    <div class="pillar-file"><span class="file-name">pom.xml</span><span
+                            class="file-tag badge badge-critical">Log4Shell</span></div>
+                    <div class="pillar-file"><span class="file-name">package.json</span><span
+                            class="file-tag badge badge-critical">node-serialize</span></div>
+                    <div class="pillar-file"><span class="file-name">requirements.txt</span><span
+                            class="file-tag badge badge-high">Django 2.0</span></div>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="--fill-color:var(--orange)" data-width="85"></div>
+                </div>
+            </div>
+
+            <div class="pillar-card">
+                <div class="pillar-header">
+                    <div class="pillar-name"><span class="pillar-icon">🔗</span> Attack Path</div>
+                    <span class="pillar-count badge badge-critical">1 file</span>
+                </div>
+                <div class="pillar-files">
+                    <div class="pillar-file"><span class="file-name">lateral_movement.tf</span><span
+                            class="file-tag badge badge-critical">5-hop chain</span></div>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="--fill-color:var(--red)" data-width="70"></div>
+                </div>
+            </div>
+
+            <div class="pillar-card">
+                <div class="pillar-header">
+                    <div class="pillar-name"><span class="pillar-icon">⚡</span> API Security</div>
+                    <span class="pillar-count badge badge-high">3 files</span>
+                </div>
+                <div class="pillar-files">
+                    <div class="pillar-file"><span class="file-name">graphql_server.js</span><span
+                            class="file-tag badge badge-critical">IDOR/DoS</span></div>
+                    <div class="pillar-file"><span class="file-name">swagger.yaml</span><span
+                            class="file-tag badge badge-high">No Auth</span></div>
+                    <div class="pillar-file"><span class="file-name">soap_wsdl.xml</span><span
+                            class="file-tag badge badge-medium">XXE/WS-Sec</span></div>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="--fill-color:var(--cyan)" data-width="90"></div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Vulnerability Index Table -->
+        <div class="section-title fade-in">📋 Key Vulnerability Index</div>
+        <div class="vuln-table-wrap fade-in">
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Vulnerability</th>
+                        <th>File</th>
+                        <th>CWE</th>
+                        <th>Severity</th>
+                        <th>Scanner</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>1</td>
+                        <td>SQL Injection</td>
+                        <td class="mono">nodejs/server.js</td>
+                        <td class="mono">CWE-89</td>
+                        <td><span class="badge badge-critical">Critical</span></td>
+                        <td>SonarQube S3649</td>
+                    </tr>
+                    <tr>
+                        <td>2</td>
+                        <td>OS Command Injection</td>
+                        <td class="mono">python/app.py</td>
+                        <td class="mono">CWE-78</td>
+                        <td><span class="badge badge-critical">Critical</span></td>
+                        <td>SonarQube S4721</td>
+                    </tr>
+                    <tr>
+                        <td>3</td>
+                        <td>Insecure Deserialization (node-serialize / CVE-2017-5941)</td>
+                        <td class="mono">sast_advanced/deserialization_gadget.js</td>
+                        <td class="mono">CWE-502</td>
+                        <td><span class="badge badge-critical">Critical</span></td>
+                        <td>Trivy / Snyk</td>
+                    </tr>
+                    <tr>
+                        <td>4</td>
+                        <td>SSTI → RCE (Jinja2)</td>
+                        <td class="mono">sast_advanced/ssti_jinja.py</td>
+                        <td class="mono">CWE-94</td>
+                        <td><span class="badge badge-critical">Critical</span></td>
+                        <td>SonarQube S5131</td>
+                    </tr>
+                    <tr>
+                        <td>5</td>
+                        <td>Log4Shell (CVE-2021-44228)</td>
+                        <td class="mono">sca/pom.xml</td>
+                        <td class="mono">CWE-502</td>
+                        <td><span class="badge badge-critical">Critical</span></td>
+                        <td>Trivy / Snyk</td>
+                    </tr>
+                    <tr>
+                        <td>6</td>
+                        <td>Prototype Pollution</td>
+                        <td class="mono">sast_advanced/deserialization_gadget.js</td>
+                        <td class="mono">CWE-1321</td>
+                        <td><span class="badge badge-critical">Critical</span></td>
+                        <td>Semgrep</td>
+                    </tr>
+                    <tr>
+                        <td>7</td>
+                        <td>Hardcoded AWS Credentials</td>
+                        <td class="mono">secrets/hardcoded_credentials.txt</td>
+                        <td class="mono">CWE-798</td>
+                        <td><span class="badge badge-critical">Critical</span></td>
+                        <td>TruffleHog / Gitleaks</td>
+                    </tr>
+                    <tr>
+                        <td>8</td>
+                        <td>Public S3 Bucket (0.0.0.0/0)</td>
+                        <td class="mono">cspm/aws_insecure.tf</td>
+                        <td class="mono">CIS AWS 2.1</td>
+                        <td><span class="badge badge-critical">Critical</span></td>
+                        <td>Checkov / tfsec</td>
+                    </tr>
+                    <tr>
+                        <td>9</td>
+                        <td>K8s Privileged Container</td>
+                        <td class="mono">kspm/vulnerable_deployment.yaml</td>
+                        <td class="mono">CIS K8s 5.2</td>
+                        <td><span class="badge badge-critical">Critical</span></td>
+                        <td>kubesec / Falco</td>
+                    </tr>
+                    <tr>
+                        <td>10</td>
+                        <td>Prompt Injection / LLM01</td>
+                        <td class="mono">ai_spm/llm_app.py</td>
+                        <td class="mono">OWASP LLM01</td>
+                        <td><span class="badge badge-critical">Critical</span></td>
+                        <td>AI-SPM Scaner</td>
+                    </tr>
+                    <tr>
+                        <td>11</td>
+                        <td>Plaintext PII (SSN, CVV)</td>
+                        <td class="mono">dspm/pii_phi_data.sql</td>
+                        <td class="mono">PCI-DSS 3.4</td>
+                        <td><span class="badge badge-critical">Critical</span></td>
+                        <td>DSPM Scanner</td>
+                    </tr>
+                    <tr>
+                        <td>12</td>
+                        <td>IAM Wildcard (Action:* Resource:*)</td>
+                        <td class="mono">ciem/overly_permissive_iam.tf</td>
+                        <td class="mono">CIS AWS 1.16</td>
+                        <td><span class="badge badge-critical">Critical</span></td>
+                        <td>Checkov / TigerGate</td>
+                    </tr>
+                    <tr>
+                        <td>13</td>
+                        <td>CI/CD Script Injection</td>
+                        <td class="mono">.github/workflows/insecure-ci.yml</td>
+                        <td class="mono">CWE-78</td>
+                        <td><span class="badge badge-high">High</span></td>
+                        <td>GitHub Advanced Security</td>
+                    </tr>
+                    <tr>
+                        <td>14</td>
+                        <td>Docker Root User (CIS 4.1)</td>
+                        <td class="mono">docker/Dockerfile.insecure</td>
+                        <td class="mono">CIS Docker 4.1</td>
+                        <td><span class="badge badge-high">High</span></td>
+                        <td>Hadolint / Trivy</td>
+                    </tr>
+                    <tr>
+                        <td>15</td>
+                        <td>SSRF</td>
+                        <td class="mono">nodejs/server.js</td>
+                        <td class="mono">CWE-918</td>
+                        <td><span class="badge badge-high">High</span></td>
+                        <td>SonarQube S5144</td>
+                    </tr>
+                    <tr>
+                        <td>16</td>
+                        <td>XSS (dangerouslySetInnerHTML)</td>
+                        <td class="mono">mega-test-project/frontend/src/App.jsx</td>
+                        <td class="mono">CWE-79</td>
+                        <td><span class="badge badge-high">High</span></td>
+                        <td>SonarQube S5247</td>
+                    </tr>
+                    <tr>
+                        <td>17</td>
+                        <td>DNS Tunneling / C2 Exfiltration</td>
+                        <td class="mono">cwpp/runtime/runtime_attack_advanced.sh</td>
+                        <td class="mono">T1048.003</td>
+                        <td><span class="badge badge-high">High</span></td>
+                        <td>TigerGate eBPF</td>
+                    </tr>
+                    <tr>
+                        <td>18</td>
+                        <td>Open Redirect</td>
+                        <td class="mono">sast_advanced/ssti_jinja.py</td>
+                        <td class="mono">CWE-601</td>
+                        <td><span class="badge badge-medium">Medium</span></td>
+                        <td>Burp Suite / SonarQube</td>
+                    </tr>
+                    <tr>
+                        <td>19</td>
+                        <td>Missing HTTPS on SOAP API</td>
+                        <td class="mono">api/soap_wsdl.xml</td>
+                        <td class="mono">CWE-319</td>
+                        <td><span class="badge badge-medium">Medium</span></td>
+                        <td>API Scanner</td>
+                    </tr>
+                    <tr>
+                        <td>20</td>
+                        <td>Cognitive Complexity (SonarQube CPD)</td>
+                        <td class="mono">code_quality/complex_spaghetti.py</td>
+                        <td class="mono">SQ-S3776</td>
+                        <td><span class="badge badge-info">Info</span></td>
+                        <td>SonarQube</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Footer -->
+        <footer class="fade-in">
+            <p>⚠️ This suite is <strong>intentionally insecure</strong>. For CNAPP testing purposes only.<br>
+                Built for <a href="#">TigerGate Security Platform</a> |
+                <a href="https://github.com/tigergate/tigergate-test">GitHub</a> |
+                Covers OWASP Top 10, CIS Benchmarks, MITRE ATT&CK Cloud Matrix
+            </p>
+        </footer>
+
+    </div>
+
+    <script>
+        // Animated counters
+        function animateCounter(el, target, duration = 1800) {
+            let start = 0;
+            const step = target / (duration / 16);
+            const timer = setInterval(() => {
+                start += step;
+                if (start >= target) { el.textContent = target; clearInterval(timer); return; }
+                el.textContent = Math.round(start);
+            }, 16);
+        }
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(e => {
+                if (e.isIntersecting) {
+                    animateCounter(document.getElementById('kpi-vulns'), 1051);
+                    animateCounter(document.getElementById('kpi-pillars'), 11);
+                    animateCounter(document.getElementById('kpi-langs'), 7);
+                    animateCounter(document.getElementById('kpi-clouds'), 4);
+                    animateCounter(document.getElementById('kpi-cwe'), 38);
+                    animateCounter(document.getElementById('kpi-files'), 47);
+
+                    // Animate progress bars
+                    document.querySelectorAll('.progress-fill').forEach(bar => {
+                        bar.style.width = bar.dataset.width + '%';
+                    });
+                    observer.disconnect();
+                }
+            });
+        }, { threshold: 0.1 });
+
+        observer.observe(document.querySelector('.kpi-grid'));
+    </script>
+</body>
+
+</html>

@@ -53,30 +53,35 @@ help:
 	@echo -e "$(YELLOW)  ═══════════════════════════════════════════════════════$(NC)"
 	@echo ""
 	@echo -e "  $(GREEN)Setup$(NC)"
-	@echo "    install        Install all language dependencies (Node.js, Python, Ruby)"
-	@echo "    clean          Remove generated files, logs, virtualenvs"
+	@echo "    install          Install all language dependencies (Node.js, Python, Ruby)"
+	@echo "    install-hooks    Install git pre-commit hooks (syntax + secret checks)"
+	@echo "    clean            Remove generated files, logs, virtualenvs"
 	@echo ""
 	@echo -e "  $(GREEN)Development$(NC)"
-	@echo "    start          Start all services in background"
-	@echo "    start-node     Start Node.js Express server (port 3000)"
-	@echo "    start-python   Start Python Flask server (port 5000)"
-	@echo "    start-ruby     Start Ruby Sinatra server (port 4567)"
-	@echo "    start-graphql  Start GraphQL Apollo server (port 4000)"
-	@echo "    stop           Stop all running services"
-	@echo "    test           Run syntax validation for all files"
+	@echo "    start            Start all services in background"
+	@echo "    start-node       Start Node.js Express server (port 3000)"
+	@echo "    start-python     Start Python Flask server (port 5000)"
+	@echo "    start-ruby       Start Ruby Sinatra server (port 4567)"
+	@echo "    start-graphql    Start GraphQL Apollo server (port 4000)"
+	@echo "    stop             Stop all running services"
+	@echo "    test             Run syntax validation for all files"
+	@echo "    open-dashboard   Open the HTML Security Coverage Dashboard"
 	@echo ""
 	@echo -e "  $(GREEN)Security Scanning$(NC)"
-	@echo "    scan-sonar     Run SonarQube SAST scan (Docker-based)"
-	@echo "    scan-trivy     Scan Docker images for CVEs"
-	@echo "    scan-checkov   Run Checkov IaC misconfiguration scan"
-	@echo "    scan-tfsec     Run tfsec Terraform security scan"
-	@echo "    scan-hadolint  Lint all Dockerfiles with Hadolint"
-	@echo "    scan-kubesec   Run kubesec on K8s manifests"
-	@echo "    scan-all       Run all scanners sequentially"
+	@echo "    scan-sonar       Run SonarQube SAST scan (Docker-based)"
+	@echo "    scan-trivy       Scan Docker images and SCA for CVEs"
+	@echo "    scan-checkov     Run Checkov IaC misconfiguration scan"
+	@echo "    scan-tfsec       Run tfsec Terraform security scan"
+	@echo "    scan-hadolint    Lint all Dockerfiles with Hadolint"
+	@echo "    scan-kubesec     Run kubesec on K8s manifests"
+	@echo "    scan-gitleaks    Run Gitleaks secrets scanner"
+	@echo "    scan-semgrep     Run Semgrep SAST (multi-language)"
+	@echo "    scan-all         Run ALL scanners sequentially"
 	@echo ""
 	@echo -e "  $(GREEN)Runtime Testing$(NC)"
-	@echo "    attack         Run eBPF runtime attack simulator"
-	@echo "    count-vulns    Count total vulnerability markers across all files"
+	@echo "    attack           Run eBPF runtime attack simulation (basic)"
+	@echo "    attack-advanced  Run advanced CWPP attack simulation (T001–T005)"
+	@echo "    count-vulns      Count total vulnerability markers across all files"
 	@echo ""
 
 
@@ -300,3 +305,64 @@ clean:
 	@find . -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
 	@find . -name "*.pyc" -delete 2>/dev/null || true
 	@echo -e "$(GREEN)✓ Clean complete.$(NC)"
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# GIT HOOKS
+# ════════════════════════════════════════════════════════════════════════════
+install-hooks:
+@echo -e "$(CYAN)Installing pre-commit hooks...$(NC)"
+@cp hooks/pre-commit .git/hooks/pre-commit
+@chmod +x .git/hooks/pre-commit
+@echo -e "$(GREEN)✓ Pre-commit hook installed. Will run on every commit.$(NC)"
+
+# ════════════════════════════════════════════════════════════════════════════
+# DASHBOARD
+# ════════════════════════════════════════════════════════════════════════════
+open-dashboard:
+@echo -e "$(CYAN)Opening Security Coverage Dashboard...$(NC)"
+@xdg-open dashboard.html 2>/dev/null || open dashboard.html 2>/dev/null || \
+    echo "Open dashboard.html in your browser: file://$(ROOT_DIR)/dashboard.html"
+
+# ════════════════════════════════════════════════════════════════════════════
+# ADDITIONAL SCANNERS
+# ════════════════════════════════════════════════════════════════════════════
+scan-gitleaks:
+@echo -e "$(CYAN)Running Gitleaks secrets scanner...$(NC)"
+@docker run --rm -v $(ROOT_DIR):/path \
+    zricethezav/gitleaks:latest detect --source=/path -v --no-git || true
+@echo -e "$(GREEN)✓ Gitleaks scan complete.$(NC)"
+
+scan-semgrep:
+@echo -e "$(CYAN)Running Semgrep SAST (multi-language)...$(NC)"
+@docker run --rm \
+    -v $(ROOT_DIR):/src \
+    semgrep/semgrep:latest semgrep \
+    --config auto \
+    --severity ERROR \
+    --output /dev/stdout \
+    /src/nodejs /src/python /src/php /src/sast_advanced || true
+@echo -e "$(GREEN)✓ Semgrep scan complete.$(NC)"
+
+scan-trivy-sca:
+@echo -e "$(CYAN)Running Trivy SCA (package vulnerability scan)...$(NC)"
+@docker run --rm -v $(ROOT_DIR):/src \
+    aquasec/trivy:latest fs /src/sca \
+    --severity HIGH,CRITICAL \
+    --format table || true
+@echo -e "$(GREEN)✓ Trivy SCA scan complete.$(NC)"
+
+attack-advanced:
+@echo -e "$(RED)WARNING: Running advanced CWPP attack simulation (T001–T005).$(NC)"
+@echo -e "$(YELLOW)TigerGate eBPF sensors should fire – docker socket, DNS tunnel, cron, miner patterns.$(NC)"
+@chmod +x cwpp/runtime/runtime_attack_advanced.sh
+@bash cwpp/runtime/runtime_attack_advanced.sh
+
+# Override scan-all to include all new scanners
+scan-all: scan-checkov scan-tfsec scan-hadolint scan-kubesec scan-gitleaks scan-trivy-sca
+@echo ""
+@echo -e "$(GREEN)════════════════════════════════════════════════════════════$(NC)"
+@echo -e "$(GREEN)  All security scans complete! Check results above.$(NC)"
+@echo -e "$(GREEN)════════════════════════════════════════════════════════════$(NC)"
+@$(MAKE) count-vulns
+

