@@ -86,4 +86,6 @@ megadb.sqlite
 
 # Docker
 *.tar
-secrets/
+# NOTE: secrets/ directory is intentionally tracked — it contains FAKE test
+# credentials for CNAPP scanner validation (Gitleaks, TruffleHog, GitGuardian).
+# Real credentials must NEVER be committed. See SECURITY.md for details.

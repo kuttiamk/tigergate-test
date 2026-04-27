@@ -1,0 +1,98 @@
+---
+# =============================================================================
+# kspm/network_policies.yaml – TigerGate CNAPP: KSPM – Missing NetworkPolicies
+# =============================================================================
+# PURPOSE: Demonstrates missing Kubernetes NetworkPolicy — by default ALL pods
+# can communicate with ALL other pods. This is "implicit trust" and violates the
+# Kubernetes CIS Benchmark 5.3.2 and NSA/CISA Kubernetes Hardening Guide.
+#
+# KSPM FINDINGS:
+#   NP-001: No default-deny NetworkPolicy in namespace (CIS K8s 5.3.2)
+#   NP-002: No egress restriction — pods connect to internet freely
+#   NP-003: No ingress restriction — any pod can call any other pod
+#   NP-004: Namespace isolation missing — cross-namespace traffic allowed
+#   NP-005: DNS exfiltration possible — no UDP 53 restriction
+# =============================================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: insecure-app
+  # 🔴 NP-004: No NetworkPolicy + no namespace isolation label
+  # labels:
+  #   pod-security.kubernetes.io/enforce: restricted  ← NOT SET
+
+---
+# ── NP-001: Deployment with no associated NetworkPolicy ─────────────────────
+# Default K8s behaviour: all ingress/egress allowed to this pod
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-service
+  namespace: insecure-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: payment-service
+  template:
+    metadata:
+      labels:
+        app: payment-service
+        # 🔴 NP-001: No NetworkPolicy selects this pod — fully open traffic
+    spec:
+      # 🔴 No securityContext — no runAsNonRoot, allowPrivilegeEscalation, readOnlyRootFilesystem
+      containers:
+      - name: payment
+        image: megacorp/payment:latest   # 🔴 KSPM: unpinned :latest tag
+        ports:
+        - containerPort: 8080
+        env:
+        - name: DB_PASSWORD
+          value: "ProdPassword123"       # 🔴 Hardcoded secret — should use Secret ref
+        # 🔴 No resource limits — container can exhaust node resources
+        # resources:
+        #   limits: { cpu: "500m", memory: "512Mi" }   ← NOT SET
+
+---
+# ── This is what SHOULD exist but DOESN'T ────────────────────────────────────
+# The following NetworkPolicies are intentionally ABSENT:
+#
+# 1. Default Deny All (NP-001 / NP-003):
+# apiVersion: networking.k8s.io/v1
+# kind: NetworkPolicy
+# metadata:
+#   name: default-deny-all
+#   namespace: insecure-app
+# spec:
+#   podSelector: {}   # Selects ALL pods
+#   policyTypes: [Ingress, Egress]  # Both directions DENIED by default
+#
+# 2. Allow only payment→database on 5432 (not present):
+# spec:
+#   podSelector:
+#     matchLabels: { app: payment-service }
+#   egress:
+#   - to:
+#     - podSelector:
+#         matchLabels: { app: postgresql }
+#     ports:
+#     - port: 5432
+#
+# 3. DNS allowlist (NP-005 — not present):
+# spec:
+#   egress:
+#   - ports:
+#     - port: 53
+#       protocol: UDP
+#     to:
+#     - namespaceSelector:
+#         matchLabels: { kubernetes.io/metadata.name: kube-system }
+#
+# RESULT: All pods communicate freely → single compromised pod can pivot
+# laterally to ALL services including secrets, PII databases, and admin APIs.
+#
+# 🔴 NP-002: Without egress NetworkPolicy, pod can reach:
+#   - internet (exfil data, download malware, C2 callback)
+#   - AWS IMDS (169.254.169.254) for credential theft
+#   - Other namespaces (cross-tenant data access)
+#   - Internal cluster services (etcd, kubelet API on 10250)

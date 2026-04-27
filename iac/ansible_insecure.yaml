@@ -1,0 +1,95 @@
+# =============================================================================
+# iac/ansible_insecure.yaml – TigerGate CNAPP: Ansible IaC Security
+# =============================================================================
+# PURPOSE: Demonstrates Ansible playbook misconfigurations that trigger IaC
+# security scanners (ansible-lint, Checkov, KICS).
+#
+# FINDINGS:
+#   ANS-001: SSH host key checking disabled (MITM attack possible)
+#   ANS-002: Hardcoded credentials in vars (not using Ansible Vault)
+#   ANS-003: Shell module used instead of command (command injection)
+#   ANS-004: Package installed from unverified URL (supply chain)
+#   ANS-005: Privilege escalation with no password prompt (become: yes, no become_password)
+#   ANS-006: Service started without integrity check on binary
+# =============================================================================
+---
+- name: "TigerGate CNAPP – Insecure Ansible Deployment"
+  hosts: all
+  gather_facts: true
+  become: yes            # 🔴 ANS-005: Root privilege without password challenge
+  # become_method: sudo
+  # become_ask_pass: false  # Should be true in production!
+
+  vars:
+    #  🔴 ANS-002: All secrets in plaintext vars (not Ansible Vault encrypted)
+    db_password: "ProdPassword@2024"        # 🔴 Hardcoded DB password!
+    api_key: "STRIPE_LIVE_EXAMPLE_TEST_KEY_NOT_REAL"  # 🔴 Stripe live key in playbook!
+    admin_password: "Admin123!"             # 🔴 Admin password in version control!
+    deploy_user: "root"                     # 🔴 Deploying as root!
+    download_url: "http://internal-repo.megacorp.com/app/latest.tar.gz"  # 🔴 HTTP!
+
+  environment:
+    # 🔴 ANS-002: Secrets injected into environment (visible in ps, /proc)
+    DATABASE_URL: "postgresql://admin:{{ db_password }}@prod-db:5432/prod"
+    STRIPE_SECRET: "{{ api_key }}"
+
+  tasks:
+
+    # ── ANS-001: SSH host key checking disabled ─────────────────────────────
+    - name: Copy SSH config disabling host key checking
+      copy:
+        content: |
+          Host *
+            StrictHostKeyChecking no      # 🔴 ANS-001: MITM attack possible!
+            UserKnownHostsFile /dev/null  # 🔴 Never saves host keys
+        dest: /root/.ssh/config
+        mode: '0600'
+
+    # ── ANS-003: Shell module with user-controlled variable ─────────────────
+    - name: Deploy application (insecure shell usage)
+      # 🔴 ANS-003: shell module evaluates glob/pipe — use 'command' module instead
+      # 🔴 ANS-003: app_version not sanitized — could contain shell metacharacters
+      shell: "cd /opt/app && git checkout {{ app_version }} && make deploy"
+      # Payload: app_version = "main; rm -rf /opt/app; #"
+
+    # ── ANS-004: Download from HTTP without checksum verification ───────────
+    - name: Download application binary
+      get_url:
+        url: "{{ download_url }}"   # 🔴 ANS-004: HTTP (not HTTPS) + no checksum!
+        dest: /opt/app/latest.tar.gz
+        # 🔴 Missing: checksum: "sha256:abc123..."  → supply chain attack possible
+        validate_certs: no          # 🔴 TLS certificate validation disabled!
+
+    - name: Extract application
+      unarchive:
+        src: /opt/app/latest.tar.gz
+        dest: /opt/app/
+        remote_src: yes
+        # 🔴 ANS-004: No signature verification before execution
+
+    # ── ANS-006: Start service without binary integrity check ───────────────
+    - name: Start application service
+      service:
+        name: megacorp-app
+        state: started
+        enabled: yes
+      # 🔴 ANS-006: No GPG signature check, no file hash verification on binary
+      # If ANS-004 delivered malicious binary, it starts here with root privileges
+
+    # ── ANS-002: Write secrets to config file in plaintext ──────────────────
+    - name: Write application configuration
+      copy:
+        content: |
+          DB_PASSWORD={{ db_password }}
+          API_KEY={{ api_key }}
+          ADMIN_PASS={{ admin_password }}
+        dest: /etc/megacorp/app.conf
+        mode: '0644'   # 🔴 World-readable config with secrets!
+
+    # ── ANS-003: Command injection via unvalidated register output ───────────
+    - name: Get current user
+      shell: "echo $USER && id"   # 🔴 ANS-003: shell: runs in /bin/sh, dangerous
+      register: current_user
+
+    - name: Run user-provided script
+      shell: "{{ current_user.stdout }} --setup"   # 🔴 Output used in next shell command!
