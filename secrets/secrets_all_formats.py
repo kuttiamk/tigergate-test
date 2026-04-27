@@ -65,18 +65,18 @@ REDIS_URL = "redis://:RedisP@ssw0rd@megacorp-cache.abc123.cache.amazonaws.com:63
 
 # ── CAT-06: Payment Keys ──────────────────────────────────────────────────────
 # 🔴 VULN: Stripe Live API Key (pattern: sk_live_xxxx)
-STRIPE_SECRET_KEY = "STRIPE_LIVE_EXAMPLE_TEST_KEY_NOT_REAL"
+STRIPE_SECRET_KEY = "STRIPE_LIVE_EXAMPLE_TEST_KEY_NOT_REAL"  # 🔴 VULN: Stripe Live Key pattern
 STRIPE_WEBHOOK_SECRET = "whsec_1234567890abcdefghijklmnopqrstuvwxyz"
 PAYPAL_CLIENT_SECRET = "EK5pKAeVYiDAVu4dD_Ux9U8sXeTj7A-3kNm84OmVVmHw8wFpE_V4tI8D"
 BRAINTREE_PRIVATE_KEY = "b2a61e9e35b08ffa9cc27f2bfb8440a5"
 
 # ── CAT-07: Messaging & Communication ─────────────────────────────────────────
 # 🔴 VULN: Slack Bot Token
-SLACK_BOT_TOKEN = "xoxb-EXAMPLE-2345678901234-ABCDEFghijklmnopqrstuvwx"
-SLACK_WEBHOOK = "https://hooks.slack.com/services/T0EXAMPLE/B01GHIJKL/AbCdEfGhIjKlMnOpQrStUvWxFAKE"
+SLACK_BOT_TOKEN = "xoxb-EXAMPLE-2345678901-2345678901234-ABCDEFghijklmnopqrstuvwx"  # 🔴 VULN: Slack Bot Token
+SLACK_WEBHOOK = "https://hooks.slack.com/services/T0EXAMPLE/B01GHIJKL/AbCdEfGhIjKlMnOpQrStUvWxFAKE"  # 🔴 VULN: Slack Webhook
 
 # 🔴 VULN: Twilio credentials
-TWILIO_ACCOUNT_SID = "AC-EXAMPLE-a1b2c3d4e5f6a1b2c3d4e5f6"
+TWILIO_ACCOUNT_SID = "AC-EXAMPLE-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"  # 🔴 VULN: Twilio SID pattern
 TWILIO_AUTH_TOKEN = "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
 
 # 🔴 VULN: SendGrid API Key
