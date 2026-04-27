@@ -1,0 +1,13 @@
+# =============================================================================
+# backend-python/requirements.txt
+# =============================================================================
+# BAD: Pinned to old versions with known CVEs
+# BAD: No hash verification (--require-hashes not used)
+# =============================================================================
+flask==2.3.3
+flask-cors==4.0.0
+mysql-connector-python==8.2.0
+PyJWT==2.8.0
+requests==2.31.0        # BAD: Old version — may have CVEs
+pyyaml==5.4.1           # BAD: 5.4.1 has known deserialization vulnerabilities
+Jinja2==3.1.2

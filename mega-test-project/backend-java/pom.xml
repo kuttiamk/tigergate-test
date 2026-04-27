@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- =============================================================================
+     backend-java/pom.xml – Maven Build Configuration
+     =============================================================================
+     PURPOSE: Maven build file for Spring Boot application.
+
+     ⚠️  INTENTIONAL ISSUES:
+       1. BAD: Old Spring Boot version (3.1.x) — should be latest patched version
+       2. BAD: spring-boot-devtools included (dev tool in production build)
+       3. BAD: No dependency pinning for transitive deps — supply chain risk
+       4. BAD: Log4j 1.x pulled in transitively — has CVE-2021-44228 history
+     ============================================================================= -->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <!-- BAD: Old version — should use latest patched 3.2.x -->
+    <version>3.1.5</version>
+  </parent>
+
+  <groupId>com.megacorp</groupId>
+  <artifactId>backend-java</artifactId>
+  <version>1.0</version>
+  <name>Mega Test Backend Java</name>
+
+  <properties>
+    <java.version>17</java.version>
+  </properties>
+
+  <dependencies>
+    <!-- Core Web -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+
+    <!-- JPA + MySQL -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-jpa</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.mysql</groupId>
+      <artifactId>mysql-connector-j</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+
+    <!-- BAD: DevTools should never be in production -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-devtools</artifactId>   <!-- BAD: Dev tool in prod! -->
+      <optional>true</optional>
+    </dependency>
+
+    <!-- Lombok -->
+    <dependency>
+      <groupId>org.projectlombok</groupId>
+      <artifactId>lombok</artifactId>
+      <optional>true</optional>
+    </dependency>
+
+    <!-- Testing -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <finalName>backend-java-1.0</finalName>
+    <plugins>
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+</project>

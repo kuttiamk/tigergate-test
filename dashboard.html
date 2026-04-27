@@ -1,0 +1,1142 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <title>TigerGate CNAPP – Complete Code-to-Cloud Platform</title>
+    <meta name="description"
+        content="Complete CNAPP Code-to-Cloud security testing platform: CSPM, CIEM, CWPP, KSPM, DSPM, AI-SPM, CDR, SCA, SBOM, Secrets, IaC, Zero Trust, DevSecOps, and 4 industry verticals." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap"
+        rel="stylesheet" />
+    <style>
+        :root {
+            --bg: #020408;
+            --s: rgba(255, 255, 255, .035);
+            --sh: rgba(255, 255, 255, .06);
+            --b: rgba(255, 255, 255, .06);
+            --cy: #00f0ff;
+            --pu: #8a2be2;
+            --gn: #00ffaa;
+            --rd: #ff3366;
+            --yw: #ffd600;
+            --or: #ff8c00;
+            --pi: #ff6eb4;
+            --tx: #e8eaf0;
+            --mt: #6b7a99;
+            --f: 'Outfit', sans-serif;
+            --m: 'JetBrains Mono', monospace
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0
+        }
+
+        body {
+            font-family: var(--f);
+            background: var(--bg);
+            color: var(--tx);
+            min-height: 100vh;
+            overflow-x: hidden
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(circle at 10% 15%, rgba(138, 43, 226, .15) 0%, transparent 40%), radial-gradient(circle at 90% 80%, rgba(0, 240, 255, .09) 0%, transparent 40%), radial-gradient(circle at 50% 50%, rgba(255, 51, 102, .04) 0%, transparent 60%);
+            z-index: -1;
+            animation: bg 10s ease-in-out infinite alternate
+        }
+
+        @keyframes bg {
+            to {
+                opacity: .5
+            }
+        }
+
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: linear-gradient(rgba(0, 240, 255, .025) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 240, 255, .025) 1px, transparent 1px);
+            background-size: 44px 44px;
+            z-index: -1
+        }
+
+        .wrap {
+            max-width: 1440px;
+            margin: 0 auto;
+            padding: 40px 24px
+        }
+
+        /* Header */
+        header {
+            text-align: center;
+            padding: 70px 0 56px
+        }
+
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            font-size: .8rem;
+            font-weight: 700;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: var(--cy);
+            opacity: .7;
+            margin-bottom: 22px
+        }
+
+        .eyebrow::before,
+        .eyebrow::after {
+            content: '';
+            width: 36px;
+            height: 1px;
+            background: var(--cy);
+            opacity: .4
+        }
+
+        h1 {
+            font-size: clamp(2.8rem, 7vw, 5rem);
+            font-weight: 800;
+            letter-spacing: -3px;
+            background: linear-gradient(135deg, #fff 20%, #6b7a99 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            line-height: 1.05;
+            margin-bottom: 14px
+        }
+
+        .sub {
+            font-size: 1.1rem;
+            color: var(--mt);
+            max-width: 620px;
+            margin: 0 auto 36px;
+            line-height: 1.65
+        }
+
+        .live {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0, 255, 170, .08);
+            border: 1px solid rgba(0, 255, 170, .22);
+            border-radius: 100px;
+            padding: 8px 22px;
+            font-size: .88rem;
+            font-weight: 700;
+            color: var(--gn);
+            animation: glow 2.5s ease-in-out infinite
+        }
+
+        @keyframes glow {
+
+            0%,
+            100% {
+                box-shadow: 0 0 10px rgba(0, 255, 170, .1)
+            }
+
+            50% {
+                box-shadow: 0 0 24px rgba(0, 255, 170, .3)
+            }
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--gn);
+            animation: blink 1.5s infinite
+        }
+
+        @keyframes blink {
+            50% {
+                opacity: .2
+            }
+        }
+
+        /* KPIs */
+        .kpis {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 18px;
+            margin: 52px 0
+        }
+
+        .kpi {
+            background: var(--s);
+            border: 1px solid var(--b);
+            border-radius: 20px;
+            padding: 26px 22px;
+            position: relative;
+            overflow: hidden;
+            transition: transform .3s, box-shadow .3s
+        }
+
+        .kpi::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--kc, var(--cy))
+        }
+
+        .kpi:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 22px 44px rgba(0, 0, 0, .35)
+        }
+
+        .kpi-l {
+            font-size: .75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--mt);
+            margin-bottom: 10px
+        }
+
+        .kpi-v {
+            font-size: 2.6rem;
+            font-weight: 800;
+            font-family: var(--m);
+            color: var(--kc, var(--cy));
+            line-height: 1
+        }
+
+        .kpi-s {
+            font-size: .75rem;
+            color: var(--mt);
+            margin-top: 6px
+        }
+
+        /* Section */
+        .sec {
+            margin-bottom: 52px
+        }
+
+        .st {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 22px;
+            display: flex;
+            align-items: center;
+            gap: 12px
+        }
+
+        .st::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--b)
+        }
+
+        /* Pillar grid */
+        .pg {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+            gap: 18px
+        }
+
+        .pc {
+            background: var(--s);
+            border: 1px solid var(--b);
+            border-radius: 16px;
+            padding: 22px;
+            transition: all .3s
+        }
+
+        .pc:hover {
+            background: var(--sh);
+            border-color: rgba(255, 255, 255, .12);
+            transform: translateY(-2px);
+            box-shadow: 0 14px 32px rgba(0, 0, 0, .3)
+        }
+
+        .ph {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 14px
+        }
+
+        .pn {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 700;
+            font-size: .95rem
+        }
+
+        .pi {
+            font-size: 1.35rem
+        }
+
+        .pf {
+            display: flex;
+            flex-direction: column;
+            gap: 6px
+        }
+
+        .pfi {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 7px 11px;
+            background: rgba(0, 0, 0, .3);
+            border-radius: 8px;
+            font-size: .8rem
+        }
+
+        .fn {
+            font-family: var(--m);
+            color: var(--cy);
+            opacity: .8
+        }
+
+        .bd {
+            font-size: .68rem;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: .5px
+        }
+
+        .cr {
+            background: rgba(255, 51, 102, .15);
+            color: var(--rd);
+            border: 1px solid rgba(255, 51, 102, .3)
+        }
+
+        .hi {
+            background: rgba(255, 140, 0, .15);
+            color: var(--or);
+            border: 1px solid rgba(255, 140, 0, .3)
+        }
+
+        .md {
+            background: rgba(255, 214, 0, .15);
+            color: var(--yw);
+            border: 1px solid rgba(255, 214, 0, .3)
+        }
+
+        .inf {
+            background: rgba(0, 240, 255, .1);
+            color: var(--cy);
+            border: 1px solid rgba(0, 240, 255, .2)
+        }
+
+        .gn {
+            background: rgba(0, 255, 170, .1);
+            color: var(--gn);
+            border: 1px solid rgba(0, 255, 170, .2)
+        }
+
+        .pbar {
+            height: 3px;
+            border-radius: 2px;
+            background: rgba(255, 255, 255, .05);
+            margin-top: 14px;
+            overflow: hidden
+        }
+
+        .pf2 {
+            height: 100%;
+            border-radius: 2px;
+            background: var(--fc, var(--cy));
+            transition: width 1.8s cubic-bezier(.16, 1, .3, 1);
+            width: 0
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 24px;
+            flex-wrap: wrap
+        }
+
+        .tab {
+            padding: 9px 20px;
+            border-radius: 10px;
+            border: 1px solid var(--b);
+            background: var(--s);
+            font-size: .85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all .2s;
+            color: var(--mt)
+        }
+
+        .tab.active,
+        .tab:hover {
+            background: rgba(0, 240, 255, .1);
+            border-color: rgba(0, 240, 255, .3);
+            color: var(--cy)
+        }
+
+        /* Industry grid */
+        .ig {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 18px
+        }
+
+        .ic {
+            background: var(--s);
+            border: 1px solid var(--b);
+            border-radius: 16px;
+            padding: 24px;
+            transition: all .3s
+        }
+
+        .ic:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 14px 32px rgba(0, 0, 0, .3)
+        }
+
+        .ic h3 {
+            font-size: 1rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px
+        }
+
+        .ic p {
+            font-size: .85rem;
+            color: var(--mt);
+            line-height: 1.6;
+            margin-bottom: 14px
+        }
+
+        .ic ul {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 5px
+        }
+
+        .ic li {
+            font-size: .8rem;
+            padding: 5px 10px;
+            background: rgba(0, 0, 0, .25);
+            border-radius: 6px;
+            font-family: var(--m);
+            color: var(--cy);
+            opacity: .85
+        }
+
+        /* Compliance table */
+        .tbl {
+            overflow-x: auto;
+            border-radius: 14px;
+            border: 1px solid var(--b);
+            margin-bottom: 52px
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse
+        }
+
+        thead th {
+            background: rgba(255, 255, 255, .02);
+            padding: 13px 18px;
+            text-align: left;
+            font-size: .75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--mt);
+            border-bottom: 1px solid var(--b)
+        }
+
+        tbody td {
+            padding: 12px 18px;
+            font-size: .85rem;
+            border-bottom: 1px solid var(--b)
+        }
+
+        tbody tr:last-child td {
+            border-bottom: none
+        }
+
+        tbody tr:hover td {
+            background: rgba(255, 255, 255, .02)
+        }
+
+        .mn {
+            font-family: var(--m);
+            font-size: .78rem
+        }
+
+        /* Use case badges */
+        .ucg {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 14px;
+            margin-bottom: 52px
+        }
+
+        .uc {
+            background: var(--s);
+            border: 1px solid var(--b);
+            border-radius: 12px;
+            padding: 16px 18px;
+            transition: all .2s
+        }
+
+        .uc:hover {
+            background: var(--sh);
+            transform: translateY(-2px)
+        }
+
+        .uc h4 {
+            font-size: .9rem;
+            font-weight: 700;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 7px
+        }
+
+        .uc p {
+            font-size: .78rem;
+            color: var(--mt)
+        }
+
+        .cnt {
+            font-family: var(--m);
+            font-size: .72rem;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 5px;
+            margin-top: 8px;
+            display: inline-block
+        }
+
+        footer {
+            text-align: center;
+            padding: 40px 0;
+            color: var(--mt);
+            font-size: .82rem;
+            border-top: 1px solid var(--b);
+            margin-top: 40px
+        }
+
+        footer a {
+            color: var(--cy);
+            text-decoration: none
+        }
+
+        .fade {
+            opacity: 0;
+            transform: translateY(18px);
+            animation: fu .7s cubic-bezier(.16, 1, .3, 1) forwards
+        }
+
+        @keyframes fu {
+            to {
+                opacity: 1;
+                transform: none
+            }
+        }
+
+        .d1 {
+            animation-delay: .1s
+        }
+
+        .d2 {
+            animation-delay: .2s
+        }
+
+        .d3 {
+            animation-delay: .3s
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrap">
+
+        <header class="fade">
+            <div class="eyebrow">TigerGate CNAPP − Code to Cloud</div>
+            <h1>Complete Security<br>Testing Platform</h1>
+            <p class="sub">The most comprehensive intentionally-vulnerable CNAPP monorepo. Every pillar. Every cloud.
+                Every industry. Every compliance framework.</p>
+            <div class="live"><span class="dot"></span> 1,300+ Vulnerability Markers · 18 Security Pillars · 4 Cloud
+                Providers</div>
+        </header>
+
+        <!-- KPIs -->
+        <div class="kpis">
+            <div class="kpi fade d1" style="--kc:var(--rd)">
+                <div class="kpi-l">Vuln Markers</div>
+                <div class="kpi-v" id="k1">0</div>
+                <div class="kpi-s">Across all pillars & files</div>
+            </div>
+            <div class="kpi fade d2" style="--kc:var(--cy)">
+                <div class="kpi-l">Security Pillars</div>
+                <div class="kpi-v" id="k2">0</div>
+                <div class="kpi-s">Code → Cloud → Runtime</div>
+            </div>
+            <div class="kpi fade d1" style="--kc:var(--pu)">
+                <div class="kpi-l">Languages</div>
+                <div class="kpi-v" id="k3">0</div>
+                <div class="kpi-s">JS, Python, Java, PHP, Ruby, Go</div>
+            </div>
+            <div class="kpi fade d2" style="--kc:var(--gn)">
+                <div class="kpi-l">Cloud Providers</div>
+                <div class="kpi-v" id="k4">0</div>
+                <div class="kpi-s">AWS · Azure · GCP · Oracle</div>
+            </div>
+            <div class="kpi fade d3" style="--kc:var(--yw)">
+                <div class="kpi-l">CVEs Referenced</div>
+                <div class="kpi-v" id="k5">0</div>
+                <div class="kpi-s">Log4Shell, Spring4Shell &amp; more</div>
+            </div>
+            <div class="kpi fade d1" style="--kc:var(--or)">
+                <div class="kpi-l">Source Files</div>
+                <div class="kpi-v" id="k6">0</div>
+                <div class="kpi-s">IaC, App, Runtime, API, CDR</div>
+            </div>
+            <div class="kpi fade d2" style="--kc:var(--pi)">
+                <div class="kpi-l">Compliance Frameworks</div>
+                <div class="kpi-v" id="k7">0</div>
+                <div class="kpi-s">SOC2 · PCI · HIPAA · FedRAMP</div>
+            </div>
+            <div class="kpi fade d3" style="--kc:var(--gn)">
+                <div class="kpi-l">Industry Verticals</div>
+                <div class="kpi-v" id="k8">0</div>
+                <div class="kpi-s">FinTech · Health · Gov · Startup</div>
+            </div>
+        </div>
+
+        <!-- Cloud Security Pillars -->
+        <div class="sec">
+            <div class="st fade">☁️ Cloud Security</div>
+            <div class="pg fade">
+                <div class="pc">
+                    <div class="ph">
+                        <div class="pn"><span class="pi">☁️</span> CSPM</div><span class="bd cr">4 files · 60+
+                            checks</span>
+                    </div>
+                    <div class="pf">
+                        <div class="pfi"><span class="fn">aws_insecure.tf</span><span class="bd cr">CIS v1.5.0</span>
+                        </div>
+                        <div class="pfi"><span class="fn">azure_insecure.tf</span><span class="bd hi">CIS v1.5.0</span>
+                        </div>
+                        <div class="pfi"><span class="fn">gcp_insecure.tf</span><span class="bd hi">CIS v1.3.0</span>
+                        </div>
+                        <div class="pfi"><span class="fn">oracle_insecure.tf</span><span class="bd md">CIS v1.2.0</span>
+                        </div>
+                    </div>
+                    <div class="pbar">
+                        <div class="pf2" style="--fc:var(--rd)" data-w="96"></div>
+                    </div>
+                </div>
+                <div class="pc">
+                    <div class="ph">
+                        <div class="pn"><span class="pi">⚓</span> KSPM</div><span class="bd cr">2 files</span>
+                    </div>
+                    <div class="pf">
+                        <div class="pfi"><span class="fn">vulnerable_deployment.yaml</span><span
+                                class="bd cr">privileged</span></div>
+                        <div class="pfi"><span class="fn">network_policies.yaml</span><span class="bd hi">no
+                                NetworkPolicy</span></div>
+                    </div>
+                    <div class="pbar">
+                        <div class="pf2" style="--fc:var(--pu)" data-w="82"></div>
+                    </div>
+                </div>
+                <div class="pc">
+                    <div class="ph">
+                        <div class="pn"><span class="pi">🐳</span> CWPP</div><span class="bd hi">3 files</span>
+                    </div>
+                    <div class="pf">
+                        <div class="pfi"><span class="fn">runtime_attack_advanced.sh</span><span
+                                class="bd cr">T001–T005</span></div>
+                        <div class="pfi"><span class="fn">Dockerfile.insecure</span><span class="bd hi">CIS Docker
+                                4.1</span></div>
+                        <div class="pfi"><span class="fn">attack_simulator.sh</span><span class="bd hi">eBPF 10
+                                TTPs</span></div>
+                    </div>
+                    <div class="pbar">
+                        <div class="pf2" style="--fc:var(--cy)" data-w="80"></div>
+                    </div>
+                </div>
+                <div class="pc">
+                    <div class="ph">
+                        <div class="pn"><span class="pi">⚡</span> CDR</div><span class="bd cr">2 files</span>
+                    </div>
+                    <div class="pf">
+                        <div class="pfi"><span class="fn">suspicious_api_calls.sh</span><span class="bd cr">6
+                                GuardDuty</span></div>
+                        <div class="pfi"><span class="fn">cloudtrail_events.json</span><span class="bd hi">MITRE
+                                mapped</span></div>
+                    </div>
+                    <div class="pbar">
+                        <div class="pf2" style="--fc:var(--rd)" data-w="78"></div>
+                    </div>
+                </div>
+                <div class="pc">
+                    <div class="ph">
+                        <div class="pn"><span class="pi">🛡️</span> Zero Trust</div><span class="bd hi">2 files</span>
+                    </div>
+                    <div class="pf">
+                        <div class="pfi"><span class="fn">network_segmentation.tf</span><span class="bd hi">NIST
+                                800-207</span></div>
+                        <div class="pfi"><span class="fn">identity_verification.py</span><span class="bd md">No
+                                MFA/RBAC</span></div>
+                    </div>
+                    <div class="pbar">
+                        <div class="pf2" style="--fc:var(--pu)" data-w="72"></div>
+                    </div>
+                </div>
+                <div class="pc">
+                    <div class="ph">
+                        <div class="pn"><span class="pi">λ</span> Serverless</div><span class="bd hi">3 files</span>
+                    </div>
+                    <div class="pf">
+                        <div class="pfi"><span class="fn">lambda.js</span><span class="bd cr">SSRF · RCE</span></div>
+                        <div class="pfi"><span class="fn">serverless.yml</span><span
+                                class="bd hi">over-permissioned</span></div>
+                        <div class="pfi"><span class="fn">cloudformation_insecure.yaml</span><span class="bd cr">10
+                                findings</span></div>
+                    </div>
+                    <div class="pbar">
+                        <div class="pf2" style="--fc:var(--or)" data-w="76"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Code Security Pillars -->
+        <div class="sec">
+            <div class="st fade">💻 Code Security</div>
+            <div class="pg fade">
+                <div class="pc">
+                    <div class="ph">
+                        <div class="pn"><span class="pi">🔬</span> SAST</div><span class="bd cr">7 files · 80+
+                            findings</span>
+                    </div>
+                    <div class="pf">
+                        <div class="pfi"><span class="fn">nodejs/server.js</span><span class="bd cr">SQLi · RCE ·
+                                SSRF</span></div>
+                        <div class="pfi"><span class="fn">python/app.py</span><span class="bd cr">eval · pickle ·
+                                SSTI</span></div>
+                        <div class="pfi"><span class="fn">ssti_jinja.py</span><span class="bd cr">SSTI → RCE ·
+                                XXE</span></div>
+                        <div class="pfi"><span class="fn">deserialization_gadget.js</span><span
+                                class="bd cr">CVE-2017-5941</span></div>
+                    </div>
+                    <div class="pbar">
+                        <div class="pf2" style="--fc:var(--rd)" data-w="94"></div>
+                    </div>
+                </div>
+                <div class="pc">
+                    <div class="ph">
+                        <div class="pn"><span class="pi">📦</span> SCA &amp; SBOM</div><span class="bd cr">4
+                            files</span>
+                    </div>
+                    <div class="pf">
+                        <div class="pfi"><span class="fn">sbom_cyclonedx.json</span><span class="bd cr">12 CVEs</span>
+                        </div>
+                        <div class="pfi"><span class="fn">pom.xml</span><span class="bd cr">Log4Shell CVSS 10</span>
+                        </div>
+                        <div class="pfi"><span class="fn">package.json</span><span class="bd cr">node-serialize
+                                RCE</span></div>
+                        <div class="pfi"><span class="fn">requirements.txt</span><span class="bd hi">Django 2.0</span>
+                        </div>
+                    </div>
+                    <div class="pbar">
+                        <div class="pf2" style="--fc:var(--or)" data-w="88"></div>
+                    </div>
+                </div>
+                <div class="pc">
+                    <div class="ph">
+                        <div class="pn"><span class="pi">🔑</span> Secrets Detection</div><span class="bd cr">2 files ·
+                            20+ patterns</span>
+                    </div>
+                    <div class="pf">
+                        <div class="pfi"><span class="fn">secrets_all_formats.py</span><span class="bd cr">AWS · GCP ·
+                                Azure · GitHub</span></div>
+                        <div class="pfi"><span class="fn">hardcoded_credentials.txt</span><span class="bd cr">Keys ·
+                                Tokens · JWTs</span></div>
+                    </div>
+                    <div class="pbar">
+                        <div class="pf2" style="--fc:var(--yw)" data-w="92"></div>
+                    </div>
+                </div>
+                <div class="pc">
+                    <div class="ph">
+                        <div class="pn"><span class="pi">🏗️</span> IaC Security</div><span class="bd cr">8 files</span>
+                    </div>
+                    <div class="pf">
+                        <div class="pfi"><span class="fn">cloudformation_insecure.yaml</span><span class="bd cr">cfn-nag
+                                10 checks</span></div>
+                        <div class="pfi"><span class="fn">aws_insecure.tf</span><span class="bd cr">Checkov 50+
+                                rules</span></div>
+                        <div class="pfi"><span class="fn">fedramp_violations.tf</span><span class="bd hi">NIST
+                                800-53</span></div>
+                        <div class="pfi"><span class="fn">rapid_deploy.tf</span><span class="bd hi">7
+                                anti-patterns</span></div>
+                    </div>
+                    <div class="pbar">
+                        <div class="pf2" style="--fc:var(--cy)" data-w="90"></div>
+                    </div>
+                </div>
+                <div class="pc">
+                    <div class="ph">
+                        <div class="pn"><span class="pi">🔗</span> Supply Chain</div><span class="bd cr">2 files</span>
+                    </div>
+                    <div class="pf">
+                        <div class="pfi"><span class="fn">malicious_workflow.yml</span><span class="bd cr">6 attack
+                                vectors</span></div>
+                        <div class="pfi"><span class="fn">insecure-ci.yml</span><span class="bd cr">script
+                                injection</span></div>
+                    </div>
+                    <div class="pbar">
+                        <div class="pf2" style="--fc:var(--pu)" data-w="80"></div>
+                    </div>
+                </div>
+                <div class="pc">
+                    <div class="ph">
+                        <div class="pn"><span class="pi">🚀</span> DevSecOps</div><span class="bd gn">Shift Left</span>
+                    </div>
+                    <div class="pf">
+                        <div class="pfi"><span class="fn">shift_left_pipeline.yml</span><span class="bd gn">7-stage
+                                pipeline</span></div>
+                        <div class="pfi"><span class="fn">Gitleaks → Semgrep → Trivy</span><span class="bd inf">full
+                                gates</span></div>
+                        <div class="pfi"><span class="fn">Checkov → ZAP → compliance</span><span class="bd gn">SARIF
+                                upload</span></div>
+                    </div>
+                    <div class="pbar">
+                        <div class="pf2" style="--fc:var(--gn)" data-w="85"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data & Identity -->
+        <div class="sec">
+            <div class="st fade">🔐 Data &amp; Identity</div>
+            <div class="pg fade">
+                <div class="pc">
+                    <div class="ph">
+                        <div class="pn"><span class="pi">🗄️</span> DSPM</div><span class="bd cr">2 files</span>
+                    </div>
+                    <div class="pf">
+                        <div class="pfi"><span class="fn">pii_phi_data.sql</span><span class="bd cr">SSN·CVV·PHI
+                                plaintext</span></div>
+                        <div class="pfi"><span class="fn">pii_exposure.tf</span><span class="bd hi">GDPR data
+                                flows</span></div>
+                    </div>
+                    <div class="pbar">
+                        <div class="pf2" style="--fc:var(--yw)" data-w="82"></div>
+                    </div>
+                </div>
+                <div class="pc">
+                    <div class="ph">
+                        <div class="pn"><span class="pi">🔑</span> CIEM</div><span class="bd cr">3 files</span>
+                    </div>
+                    <div class="pf">
+                        <div class="pfi"><span class="fn">overly_permissive_iam.tf</span><span class="bd cr">Action:*
+                                Resource:*</span></div>
+                        <div class="pfi"><span class="fn">cross_account.tf</span><span class="bd cr">Principal:*
+                                assume</span></div>
+                        <div class="pfi"><span class="fn">gcp_ciem.tf</span><span class="bd hi">roles/owner
+                                allUsers</span></div>
+                    </div>
+                    <div class="pbar">
+                        <div class="pf2" style="--fc:var(--or)" data-w="88"></div>
+                    </div>
+                </div>
+                <div class="pc">
+                    <div class="ph">
+                        <div class="pn"><span class="pi">🤖</span> AI-SPM</div><span class="bd hi">2 files</span>
+                    </div>
+                    <div class="pf">
+                        <div class="pfi"><span class="fn">llm_app.py</span><span class="bd cr">Prompt Injection
+                                LLM01</span></div>
+                        <div class="pfi"><span class="fn">huggingface_sagemaker.tf</span><span
+                                class="bd hi">ML01–ML03</span></div>
+                    </div>
+                    <div class="pbar">
+                        <div class="pf2" style="--fc:var(--cy)" data-w="74"></div>
+                    </div>
+                </div>
+                <div class="pc">
+                    <div class="ph">
+                        <div class="pn"><span class="pi">⚡</span> API Security</div><span class="bd cr">4 files</span>
+                    </div>
+                    <div class="pf">
+                        <div class="pfi"><span class="fn">rest_api_insecure.js</span><span class="bd cr">OWASP API Top
+                                10</span></div>
+                        <div class="pfi"><span class="fn">graphql_server.js</span><span class="bd cr">IDOR · DoS · no
+                                auth</span></div>
+                        <div class="pfi"><span class="fn">swagger.yaml</span><span class="bd hi">undocumented
+                                endpoints</span></div>
+                        <div class="pfi"><span class="fn">soap_wsdl.xml</span><span class="bd md">XXE · no WS-Sec</span>
+                        </div>
+                    </div>
+                    <div class="pbar">
+                        <div class="pf2" style="--fc:var(--cy)" data-w="90"></div>
+                    </div>
+                </div>
+                <div class="pc">
+                    <div class="ph">
+                        <div class="pn"><span class="pi">🔗</span> Attack Path</div><span class="bd cr">2 files</span>
+                    </div>
+                    <div class="pf">
+                        <div class="pfi"><span class="fn">lateral_movement.tf</span><span class="bd cr">5-hop
+                                Internet→PII</span></div>
+                        <div class="pfi"><span class="fn">cloudtrail_events.json</span><span class="bd hi">Role chain
+                                privesc</span></div>
+                    </div>
+                    <div class="pbar">
+                        <div class="pf2" style="--fc:var(--rd)" data-w="70"></div>
+                    </div>
+                </div>
+                <div class="pc">
+                    <div class="ph">
+                        <div class="pn"><span class="pi">🎭</span> Evasion</div><span class="bd hi">2 files</span>
+                    </div>
+                    <div class="pf">
+                        <div class="pfi"><span class="fn">evasion_techniques.js</span><span class="bd hi">LoTL · DoH ·
+                                polymorphic</span></div>
+                        <div class="pfi"><span class="fn">complex_spaghetti.py</span><span class="bd md">SonarQube
+                                quality</span></div>
+                    </div>
+                    <div class="pbar">
+                        <div class="pf2" style="--fc:var(--pu)" data-w="68"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Use Cases -->
+        <div class="sec">
+            <div class="st fade">🎯 Platform Use Cases</div>
+            <div class="ucg fade">
+                <div class="uc">
+                    <h4>🟠 AWS CSPM</h4>
+                    <p>CIS AWS Foundations v1.5.0 benchmark violations across networking, IAM, and storage.</p>
+                    <span class="cnt" style="background:rgba(255,140,0,.15);color:var(--or)">576+ checks mapped</span>
+                </div>
+                <div class="uc">
+                    <h4>🔵 Azure CSPM</h4>
+                    <p>CIS Azure 1.5.0: Key Vault, NSG, SQL Server, Storage Account, and Monitor misconfigs.</p>
+                    <span class="cnt" style="background:rgba(0,240,255,.1);color:var(--cy)">207+ checks mapped</span>
+                </div>
+                <div class="uc">
+                    <h4>🔴 GCP CSPM</h4>
+                    <p>CIS GCP 1.3.0: Firewall allUsers, GCS public buckets, IAM allUsers bindings.</p>
+                    <span class="cnt" style="background:rgba(255,51,102,.12);color:var(--rd)">79+ checks mapped</span>
+                </div>
+                <div class="uc">
+                    <h4>🟣 Oracle CSPM</h4>
+                    <p>CIS OCI 1.2.0: Compartment policies, VCN security lists, Object Storage misconfigs.</p>
+                    <span class="cnt" style="background:rgba(138,43,226,.15);color:var(--pu)">51+ checks mapped</span>
+                </div>
+                <div class="uc">
+                    <h4>📋 Compliance</h4>
+                    <p>SOC 2 Type II, PCI-DSS v4.0, ISO 27001:2022, FedRAMP Moderate, HIPAA Security Rule.</p>
+                    <span class="cnt" style="background:rgba(0,255,170,.1);color:var(--gn)">5 frameworks</span>
+                </div>
+                <div class="uc">
+                    <h4>🔄 DevSecOps</h4>
+                    <p>7-stage shift-left pipeline: Gitleaks → SAST → SCA → IaC → Container → DAST → Report.</p>
+                    <span class="cnt" style="background:rgba(0,255,170,.1);color:var(--gn)">Shift-left gates</span>
+                </div>
+                <div class="uc">
+                    <h4>🛡️ Zero Trust</h4>
+                    <p>NIST SP 800-207 violations: implicit trust, no micro-segmentation, static credentials.</p>
+                    <span class="cnt" style="background:rgba(138,43,226,.15);color:var(--pu)">5 ZT violations</span>
+                </div>
+                <div class="uc">
+                    <h4>📦 Supply Chain</h4>
+                    <p>SBOM (CycloneDX), unpinned actions, poisoned workflows, dependency confusion.</p>
+                    <span class="cnt" style="background:rgba(255,140,0,.15);color:var(--or)">12 CVEs in SBOM</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Industry Verticals -->
+        <div class="sec">
+            <div class="st fade">🏢 Industry Verticals</div>
+            <div class="ig fade">
+                <div class="ic" style="border-color:rgba(255,214,0,.15)">
+                    <h3>💳 FinTech</h3>
+                    <p>PCI-DSS v4.0 violations: plaintext PAN/CVV storage, unencrypted payment HTTP endpoint, eval()
+                        RCE.</p>
+                    <ul>
+                        <li>payment_processing.py — 7 PCI violations</li>
+                        <li>trading_api.js — rate limit bypass, IDOR</li>
+                        <li>fintech_iac.tf — unencrypted payment DB</li>
+                    </ul>
+                </div>
+                <div class="ic" style="border-color:rgba(0,240,255,.15)">
+                    <h3>🏥 Healthcare</h3>
+                    <p>HIPAA Security Rule: PHI via unauthenticated REST, SQL injection on PHI, no audit logging.</p>
+                    <ul>
+                        <li>ehr_system.py — 6 HIPAA violations</li>
+                        <li>dicom_server.js — no TLS, no auth</li>
+                        <li>healthcare_iac.tf — PHI in public S3</li>
+                    </ul>
+                </div>
+                <div class="ic" style="border-color:rgba(255,51,102,.15)">
+                    <h3>🏛️ Government</h3>
+                    <p>FedRAMP Moderate baseline: no MFA, TLS 1.0, EOL Windows Server 2012, no FIPS 140-2 encryption.
+                    </p>
+                    <ul>
+                        <li>fedramp_violations.tf — 7 NIST 800-53 violations</li>
+                        <li>sensitive_data_handler.py — CUI mishandling</li>
+                    </ul>
+                </div>
+                <div class="ic" style="border-color:rgba(0,255,170,.15)">
+                    <h3>🚀 Startups</h3>
+                    <p>MVP anti-patterns: root creds, default VPC, all-ports-open SG, debug mode, no backups.</p>
+                    <ul>
+                        <li>rapid_deploy.tf — 7 startup anti-patterns</li>
+                        <li>misconfigured_saas.js — multi-tenancy IDOR</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Compliance Table -->
+        <div class="sec">
+            <div class="st fade">📋 Compliance Framework Coverage</div>
+            <div class="tbl fade">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Framework</th>
+                            <th>Version</th>
+                            <th>Controls Covered</th>
+                            <th>Primary Files</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>PCI-DSS</strong></td>
+                            <td class="mn">v4.0</td>
+                            <td>Req 3.4, 3.5, 4.2, 6.4, 8.3, 10.2, 12.3</td>
+                            <td class="mn">industry/fintech/payment_processing.py</td>
+                            <td><span class="bd cr">7 violations</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>HIPAA</strong></td>
+                            <td class="mn">Security Rule</td>
+                            <td>§164.312(a)(1), (b), (c), (e)(1)</td>
+                            <td class="mn">industry/healthcare/ehr_system.py</td>
+                            <td><span class="bd cr">6 violations</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>FedRAMP</strong></td>
+                            <td class="mn">Moderate (Rev 5)</td>
+                            <td>AC-2, AU-2, SC-8, SC-28, CM-7, IA-5, SA-22</td>
+                            <td class="mn">industry/government/fedramp_violations.tf</td>
+                            <td><span class="bd cr">7 violations</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>SOC 2 Type II</strong></td>
+                            <td class="mn">2017</td>
+                            <td>CC6.1–CC9.1 (9 Trust Service Criteria)</td>
+                            <td class="mn">ciem/ · cdr/ · .github/</td>
+                            <td><span class="bd hi">9 gap findings</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>ISO 27001</strong></td>
+                            <td class="mn">2022</td>
+                            <td>A.5.15, A.7.9, A.8.5, A.8.9, A.8.16, A.8.25</td>
+                            <td class="mn">secrets/ · zero_trust/ · iac/</td>
+                            <td><span class="bd hi">9 gap findings</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>CIS AWS</strong></td>
+                            <td class="mn">v1.5.0</td>
+                            <td>IAM, Logging, Storage, Networking (50+ checks)</td>
+                            <td class="mn">cspm/aws_insecure.tf</td>
+                            <td><span class="bd cr">20+ violations</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>CIS Azure</strong></td>
+                            <td class="mn">v1.5.0</td>
+                            <td>IAM, Key Vault, SQL, Monitor (40+ checks)</td>
+                            <td class="mn">cspm/azure_insecure.tf</td>
+                            <td><span class="bd cr">16+ violations</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>CIS GCP</strong></td>
+                            <td class="mn">v1.3.0</td>
+                            <td>Firewall, IAM, GCS, Audit Logs (30+ checks)</td>
+                            <td class="mn">cspm/gcp_insecure.tf</td>
+                            <td><span class="bd hi">12+ violations</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>MITRE ATT&CK Cloud</strong></td>
+                            <td class="mn">v14</td>
+                            <td>T1530, T1552, T1562, T1078, T1048</td>
+                            <td class="mn">cdr/cloudtrail_events.json</td>
+                            <td><span class="bd cr">5 techniques</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>OWASP API Top 10</strong></td>
+                            <td class="mn">2023</td>
+                            <td>API1–API10 (all 10 risks)</td>
+                            <td class="mn">api/rest_api_insecure.js</td>
+                            <td><span class="bd cr">10/10 covered</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <footer class="fade">
+            <p>⚠️ <strong>Intentionally insecure.</strong> For CNAPP platform testing only — never deploy in
+                production.<br>
+                <a href="./README.md">README</a> · <a href="./compliance/COMPLIANCE_MAPPING.md">Compliance Mapping</a> ·
+                <a href="./CONTRIBUTING.md">Contributing</a> · <a href="./SECURITY.md">Security Policy</a><br>
+                Covers: OWASP Top 10 · CIS Benchmarks · MITRE ATT&CK Cloud · NIST 800-53/800-207
+            </p>
+        </footer>
+
+    </div>
+    <script>
+        function cnt(el, t, d = 1800) { let s = 0; const step = t / (d / 16); const id = setInterval(() => { s += step; if (s >= t) { el.textContent = t; clearInterval(id); return; } el.textContent = Math.round(s); }, 16); }
+        const io = new IntersectionObserver(es => {
+            es.forEach(e => {
+                if (e.isIntersecting) {
+                    cnt(document.getElementById('k1'), 1300);
+                    cnt(document.getElementById('k2'), 18);
+                    cnt(document.getElementById('k3'), 7);
+                    cnt(document.getElementById('k4'), 4);
+                    cnt(document.getElementById('k5'), 24);
+                    cnt(document.getElementById('k6'), 62);
+                    cnt(document.getElementById('k7'), 5);
+                    cnt(document.getElementById('k8'), 4);
+                    document.querySelectorAll('.pf2').forEach(b => b.style.width = b.dataset.w + '%');
+                    io.disconnect();
+                }
+            });
+        }, { threshold: .1 });
+        io.observe(document.querySelector('.kpis'));
+    </script>
+</body>
+
+</html>

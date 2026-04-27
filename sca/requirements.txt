@@ -1,0 +1,6 @@
+# TigerGate SCA/SBOM Test Dependencies
+requests==2.18.0
+Django==2.0
+urllib3==1.25.7
+PyYAML==3.11
+jinja2==2.10

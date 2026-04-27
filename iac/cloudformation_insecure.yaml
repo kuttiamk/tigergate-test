@@ -1,0 +1,185 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  TigerGate CNAPP Test – Insecure CloudFormation Stack
+  PURPOSE: Intentional CloudFormation IaC misconfigurations designed to trigger
+  CNAPP IaC scanners (Checkov, cfn-nag, tfsec, cfn-lint).
+
+  FINDINGS:
+    CFN-001: S3 bucket with public ACL and no versioning (CIS AWS 2.1.1)
+    CFN-002: Lambda with IAM AdministratorAccess wildcard
+    CFN-003: SQS queue without encryption (CIS AWS 2.1.2)
+    CFN-004: DynamoDB table without encryption at rest
+    CFN-005: API Gateway with no authentication (no UsagePlan, no Authorizer)
+    CFN-006: EC2 SG with 0.0.0.0/0 on port 22 and 3389 (CIS AWS 4.1)
+    CFN-007: RDS instance publicly accessible, no multi-AZ (CIS AWS 2.3.1)
+    CFN-008: CloudTrail not logging all regions (CIS AWS 2.1)
+    CFN-009: SNS topic without encryption
+    CFN-010: IAM user with console access + programmatic access (CIS AWS 1.6)
+
+Parameters:
+  Environment:
+    Type: String
+    Default: production
+    # BAD: Uses default 'production' — if stack deployed with defaults, hits prod
+
+Resources:
+
+  # ── CFN-001: Public S3 Bucket ──────────────────────────────────────────────
+  PublicDataBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: megacorp-data-public-cf
+      # 🔴 VULN: CFN-001 – Public ACL enables anonymous read access
+      AccessControl: PublicRead
+      # 🔴 VULN: No versioning (CIS 2.1.2)
+      # 🔴 VULN: No server-side encryption
+      # 🔴 VULN: No access logging
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+
+  PublicBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref PublicDataBucket
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal: "*"   # 🔴 VULN: Wildcard principal — anyone can access
+            Action:
+              - s3:GetObject
+              - s3:ListBucket
+            Resource:
+              - !GetAtt PublicDataBucket.Arn
+              - !Sub "${PublicDataBucket.Arn}/*"
+
+  # ── CFN-002: Overpermissioned Lambda ──────────────────────────────────────
+  VulnerableLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: LambdaAdminRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: AdminPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: "*"         # 🔴 VULN: CFN-002 – AdministratorAccess wildcard
+                Resource: "*"       # 🔴 VULN: All resources
+
+  VulnerableLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: MegacorpDataProcessor
+      Runtime: python3.8       # 🔴 VULN: EOL runtime (Python 3.8 EOL Oct 2024)
+      Handler: index.handler
+      Role: !GetAtt VulnerableLambdaRole.Arn
+      # 🔴 VULN: Hardcoded DB password in environment variable
+      Environment:
+        Variables:
+          DB_PASSWORD: "megacorp_prod_pass_123"   # 🔴 VULN: Hardcoded secret!
+          AWS_SECRET_KEY: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"  # 🔴 VULN!
+          ENVIRONMENT: !Ref Environment
+      # 🔴 VULN: No VPC configuration — Lambda in public internet
+      # 🔴 VULN: No reserved concurrency — DoS possible
+      Code:
+        ZipFile: |
+          import os, subprocess
+          def handler(event, context):
+              # 🔴 VULN: Command injection via event payload
+              cmd = event.get('command', 'id')
+              return subprocess.check_output(cmd, shell=True).decode()
+
+  # ── CFN-003: Unencrypted SQS Queue ────────────────────────────────────────
+  InsecureQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: megacorp-payments-queue
+      # 🔴 VULN: CFN-003 – No KmsMasterKeyId (no SSE-KMS encryption)
+      # 🔴 VULN: No DLQ configured (messages lost on failure)
+      # 🔴 VULN: Default visibility timeout (messages re-processed)
+
+  InsecureQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues: [!Ref InsecureQueue]
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal: "*"   # 🔴 VULN: Anyone can send/receive on payment queue!
+            Action: ["sqs:SendMessage", "sqs:ReceiveMessage", "sqs:DeleteMessage"]
+            Resource: !GetAtt InsecureQueue.Arn
+
+  # ── CFN-004: Unencrypted DynamoDB ─────────────────────────────────────────
+  UserDataTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: UserPIIData
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+      # 🔴 VULN: CFN-004 – No SSESpecification (encryption at rest disabled default)
+      # 🔴 VULN: No PointInTimeRecoverySpecification
+      # 🔴 VULN: No deletion protection
+
+  # ── CFN-006: Insecure Security Group ──────────────────────────────────────
+  InsecureSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Megacorp Web Security Group
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: "0.0.0.0/0"    # 🔴 VULN: SSH open to internet (CIS 4.1)
+        - IpProtocol: tcp
+          FromPort: 3389
+          ToPort: 3389
+          CidrIp: "0.0.0.0/0"    # 🔴 VULN: RDP open to internet (CIS 4.2)
+        - IpProtocol: "-1"
+          CidrIp: "0.0.0.0/0"    # 🔴 VULN: ALL traffic inbound from anywhere!
+
+  # ── CFN-007: Public RDS Instance ──────────────────────────────────────────
+  InsecureRDS:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceClass: db.t3.micro
+      Engine: mysql
+      MasterUsername: admin
+      MasterUserPassword: "RootPassword123!"   # 🔴 VULN: Hardcoded RDS password!
+      AllocatedStorage: 20
+      PubliclyAccessible: true          # 🔴 VULN: CFN-007 – RDS publicly accessible
+      MultiAZ: false                    # 🔴 VULN: No high availability
+      StorageEncrypted: false           # 🔴 VULN: No encryption at rest
+      DeletionPolicy: Delete            # 🔴 VULN: No data retention protection
+      # 🔴 VULN: No DBSubnetGroup — deploys to default VPC (public)
+
+  # ── CFN-008: CloudTrail (incomplete) ──────────────────────────────────────
+  IncompleteCloudTrail:
+    Type: AWS::CloudTrail::Trail
+    Properties:
+      TrailName: megacorp-audit
+      S3BucketName: !Ref PublicDataBucket  # 🔴 VULN: Audit logs in public bucket!
+      IsLogging: true
+      IsMultiRegionTrail: false    # 🔴 VULN: CFN-008 – Single region only (misses other regions)
+      IncludeGlobalServiceEvents: false  # 🔴 VULN: IAM events not captured!
+      EnableLogFileValidation: false     # 🔴 VULN: Log tampering not detectable
+
+Outputs:
+  BucketURL:
+    Value: !Sub "https://${PublicDataBucket}.s3.amazonaws.com"
+    Description: "Public S3 Bucket URL (intentionally exposed)"
+  RDSEndpoint:
+    Value: !GetAtt InsecureRDS.Endpoint.Address
+    Description: "Publicly accessible RDS endpoint (intentionally exposed)"

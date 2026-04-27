@@ -1,0 +1,12 @@
+{
+  "name": "tigergate-vulnerable-deps",
+  "version": "1.0.0",
+  "description": "Intentionally vulnerable dependencies for SCA / SBOM tracking",
+  "dependencies": {
+    "express": "3.0.0",
+    "lodash": "4.17.4",
+    "node-serialize": "0.0.4",
+    "moment": "2.19.3",
+    "axios": "0.21.1"
+  }
+}

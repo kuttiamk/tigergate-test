@@ -1,0 +1,41 @@
+# =============================================================================
+# .github/CODEOWNERS – TigerGate CNAPP Test: Code Ownership & Governance
+# =============================================================================
+# PURPOSE: Intentionally misconfirm code ownership to trigger PR governance 
+# violation detections and Code Review coverage gap scanning.
+#
+# GOVERNANCE VULNERABILITIES IN THIS FILE:
+#   GOV-001: Critical paths (infra, secrets) have no mandatory reviewers
+#   GOV-002: Wildcard rule (*) maps to a non-existent team (auto-approval bypass)
+#   GOV-003: Conflicting rules — last rule always wins in GitHub, creating gaps
+#   GOV-004: CI/CD pipeline itself has no CODEOWNERS (anyone can change pipelines)
+# =============================================================================
+
+# Global fallback — maps to a team that no longer exists (auto-approves PRs!)
+# 🔴 VULN / GOV-002: Non-existent team means no one truly reviews
+* @tigergate/defunct-team
+
+# --- Application Code ---
+/nodejs/       @tigergate/backend-team
+/python/       @tigergate/backend-team
+/java/         @tigergate/backend-team
+# 🔴 VULN / GOV-003: /php/ has no owner — changes go un-reviewed!
+# (intentionally omitted)
+
+# --- Infrastructure ---
+# 🔴 VULN / GOV-001: Terraform files affecting production have no mandatory reviewer
+# /cspm/       @tigergate/sre-team   <-- This is uncommented intentionally for test
+/kspm/         @tigergate/platform-team
+/ciem/         @tigergate/iam-team
+
+# --- Security-Sensitive Files ---
+# 🔴 VULN / GOV-001: Secrets directory has no protection (anyone can add secrets)
+# /secrets/    @tigergate/security-team   <-- Left unprotected
+
+# --- CI/CD Pipeline ---
+# 🔴 VULN / GOV-004: The pipelines themselves are unprotected — anyone can tamper  
+# /.github/workflows/  @tigergate/security-team   <-- Unprotected pipeline!
+
+# --- Frontend ---
+*.css @tigergate/design-team
+*.jsx @tigergate/frontend-team

@@ -1,38 +1,222 @@
 apiVersion: apps/v1
+# =============================================================================
+# kspm/vulnerable_deployment.yaml – TigerGate CNAPP Test: K8s Security Misconfigs
+# =============================================================================
+# PURPOSE: Intentionally misconfigured Kubernetes manifests for KSPM testing.
+# Tigergate KSPM checks every manifest against CIS Kubernetes Benchmark rules.
+#
+# ⚠️  EDUCATIONAL USE ONLY — Never deploy in production.
+#
+# KSPM FINDINGS TRIGGERED (CIS Kubernetes Benchmark):
+#   CIS 5.1.3  – privileged:true allows container breakout
+#   CIS 5.1.4  – Containers sharing host namespaces (PID/Network/IPC)
+#   CIS 5.1.5  – Allowing privilege escalation
+#   CIS 5.2.2  – runAsUser:0 (running as root)
+#   CIS 5.2.6  – CAP_NET_ADMIN, CAP_SYS_ADMIN capabilities
+#   CIS 5.4.1  – Secrets as environment variables
+#   CIS 5.4.2  – Default service account auto-mounted (cluster-admin bound)
+#   CIS 5.7.4  – No resource limits defined
+# =============================================================================
+
+---
+# =============================================================================
+# DEPLOYMENT 1: Privileged Pod with Full Container Escape Vector
+# =============================================================================
 kind: Deployment
 metadata:
-  name: vulnerable-app
+  name: tigergate-privileged-app
+  namespace: default
+  annotations:
+    "kubectl.kubernetes.io/last-applied-configuration": "visible to anyone with kubectl access"
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: vulnerable
+      app: privileged-app
   template:
     metadata:
       labels:
-        app: vulnerable
+        app: privileged-app
     spec:
-      hostNetwork: true # KSPM alert
-      hostPID: true # KSPM alert
-      hostIPC: true # KSPM alert
-      automountServiceAccountToken: true # KSPM alert
+      # 🔴 KSPM: Shares host-level namespaces — container can see host processes/network/IPC
+      hostNetwork: true   # 🔴 CIS 5.2.4: Container sees all host network interfaces!
+      hostPID:    true    # 🔴 CIS 5.2.2: Container sees all host processes!
+      hostIPC:    true    # 🔴 CIS 5.2.3: Container shares host IPC — can read shared memory!
+
+      # 🔴 BAD: Service account token auto-mounted (CIS 5.1.6)
+      automountServiceAccountToken: true   # BAD: Token accessible inside container
+
+      # BAD: No node selector or affinity — pod can land on any node
+      # BAD: No pod anti-affinity — all replicas could land on same node
+
       containers:
-      - name: main-container
-        image: nginx:1.14.2
-        securityContext:
-          privileged: true # KSPM alert
-          runAsUser: 0 # KSPM alert
-          allowPrivilegeEscalation: true # KSPM alert
+        - name: privileged-container
+          image: nginx:1.14.2              # BAD: Outdated image (2018, many CVEs!)
+          # BAD: No image digest pinning — :1.14.2 tag can be replaced by registry
+
+          securityContext:
+            privileged: true              # 🔴 CIS 5.1.3: FULL host access! Container breakout!
+            runAsUser:  0                 # 🔴 CIS 5.2.6: Running as root!
+            runAsGroup: 0                 # 🔴 Root group!
+            allowPrivilegeEscalation: true     # 🔴 CIS 5.1.5!
+            readOnlyRootFilesystem: false      # BAD: Writable filesystem (persistence risk)
+            capabilities:
+              add:
+                - NET_ADMIN               # 🔴 Network manipulation capability
+                - SYS_ADMIN               # 🔴 System admin — nearly equivalent to root!
+                - SYS_PTRACE              # 🔴 Can trace/debug any process!
+                - NET_RAW                 # 🔴 Raw packet crafting!
+
+          # 🔴 BAD: CIS 5.7.4 – No CPU or memory resource limits!
+          # When no limits are set: one pod can starve all others on the node
+          # resources:                    # ← MISSING! Omitted intentionally
+
+          # 🔴 KSPM: Secrets as plain text environment variables (CIS 5.4.1)
+          # FIX: Mount Kubernetes Secrets as volumes or use external secrets operator
+          env:
+            - name: DB_PASSWORD
+              value: "root123"            # 🔴 Plaintext password in env var!
+            - name: AWS_ACCESS_KEY_ID
+              value: "AKIAIOSFODNN7EXAMPLE"   # 🔴 AWS key in env var!
+            - name: AWS_SECRET_ACCESS_KEY
+              value: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"  # 🔴!
+            - name: STRIPE_KEY
+              value: "sk_live_FAKE_KEY_FOR_TESTING"  # 🔴 API key in env!
+
+          volumeMounts:
+            # 🔴 CRITICAL: Mounts host Docker socket — full cluster control!
+            - name: docker-sock
+              mountPath: /var/run/docker.sock  # 🔴 Docker socket = container escape!
+            # 🔴 CRITICAL: Mounts / of host — full host filesystem access!
+            - name: host-root
+              mountPath: /host              # 🔴 Reads /host/etc/shadow, /host/root/.ssh!
+
+          # BAD: No liveness or readiness probes
+          ports:
+            - containerPort: 80
+
+      volumes:
+        - name: docker-sock
+          hostPath:
+            path: /var/run/docker.sock    # 🔴 Exposes Docker daemon!
+            type: Socket
+        - name: host-root
+          hostPath:
+            path: /                       # 🔴 Entire host filesystem!
+            type: Directory
+
 ---
+# =============================================================================
+# DEPLOYMENT 2: Application with Secrets as Plain Env Vars
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tigergate-backend-app
+  namespace: default
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      serviceAccountName: default          # BAD: Uses default SA (cluster-admin below!)
+      automountServiceAccountToken: true   # 🔴 default SA has cluster-admin!
+
+      containers:
+        - name: backend
+          image: node:16                   # BAD: EOL Node.js 16!
+          securityContext:
+            runAsUser: 0                   # 🔴 Root!
+            allowPrivilegeEscalation: true # 🔴
+          # BAD: No resource limits or requests
+          env:
+            - name: DATABASE_URL
+              value: "mysql://root:root123@mysql:3306/megadb"  # 🔴 Full DB URL with password!
+            - name: JWT_SECRET
+              value: "notsecret"           # 🔴 JWT secret in env!
+            - name: NODE_ENV
+              value: "production"
+          # BAD: No readiness/liveness probes — traffic sent to not-ready pods
+
+---
+# =============================================================================
+# BAD K8s SECRET – Trivially Decoded Base64 Password
+# KSPM: "Kubernetes Secrets are not encrypted at rest by default"
+# base64 is NOT encryption! echo "cm9vdDEyMw==" | base64 -d → root123
+# FIX: Enable etcd encryption at rest + use external secrets (Vault, AWS SSM, etc.)
+# =============================================================================
+apiVersion: v1
+kind: Secret
+metadata:
+  name: tigergate-db-secret
+  namespace: default
+type: Opaque
+data:
+  # 🔴 BAD: base64 of 'root123' — decode instantly with: echo "cm9vdDEyMw==" | base64 -d
+  database-password: cm9vdDEyMw==        # 🔴 'root123' encoded
+  # 🔴 BAD: base64 of 'supersecretjwt'
+  jwt-secret: c3VwZXJzZWNyZXRqd3Q=      # 🔴 'supersecretjwt' encoded
+  # 🔴 BAD: AWS key in K8s Secret (unencrypted in etcd!)
+  aws-key: QUTBJT09TRk9ETk43RVhBTVBMRQ== # 🔴 base64 of 'AKIAIOSFODNN7EXAMPLE'
+
+---
+# =============================================================================
+# DANGEROUS RBAC – system:anonymous → cluster-admin
+# KSPM: "Unauthenticated users should not have cluster-admin access"
+# =============================================================================
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: overly-permissive-binding
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: cluster-admin
+  name: tigergate-dangerous-crb
 subjects:
-- kind: ServiceAccount
-  name: default
-  namespace: default
+  # 🔴 CRITICAL: Unauthenticated requests get full cluster admin!
+  - kind: User
+    name: system:anonymous              # 🔴 No auth required!
+    apiGroup: rbac.authorization.k8s.io
+  # 🔴 BAD: Default SA in default namespace → cluster-admin
+  - kind: ServiceAccount
+    name: default
+    namespace: default                  # 🔴 SA used by all pods without serviceAccountName!
+  # 🔴 BAD: ALL authenticated users → cluster-admin!
+  - kind: Group
+    name: system:authenticated          # 🔴 Every logged-in user is cluster-admin!
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin                   # 🔴 Full cluster control!
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# =============================================================================
+# NO NETWORKPOLICY – All pods can talk to all other pods
+# KSPM: "NetworkPolicy should be configured to restrict pod-to-pod traffic"
+# Without NetworkPolicy, a compromised pod can reach:
+# - The Kubernetes API server
+# - etcd (if exposed within the cluster)
+# - Any other pod, service, or node
+# NOTE: NetworkPolicy is intentionally OMITTED — this is the KSPM finding.
+# =============================================================================
+# apiVersion: networking.k8s.io/v1
+# kind: NetworkPolicy     ← MISSING! No network isolation in this namespace.
+
+---
+# =============================================================================
+# NO PODSECURITYPOLICY / POD SECURITY ADMISSION
+# KSPM: "PodSecurityAdmission is not configured"
+# Without PSA/PSP, there's no cluster-level guardrail preventing privileged pods
+# =============================================================================
+# Namespace should have label: pod-security.kubernetes.io/enforce: restricted
+# Currently — NO PSA label on namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tigergate-insecure
+  # 🔴 KSPM: No PodSecurity admission labels on namespace means PSA not enforced!
+  # FIX: Add labels:
+  #   pod-security.kubernetes.io/enforce: restricted
+  #   pod-security.kubernetes.io/audit: baseline

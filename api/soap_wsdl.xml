@@ -1,20 +1,58 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<definitions name="VulnerableService" targetNamespace="http://example.com/soap" xmlns="http://schemas.xmlsoap.org/wsdl/">
-  <!-- 
-    A basic vulnerable SOAP WSDL definition structure.
-    TigerGate API Security will scan this for potential XXE ingestion vectors
-    or unauthenticated bindings.
-  -->
-  <message name="GetUserDataRequest">
-    <part name="userId" type="xsd:string"/>
-  </message>
-  <message name="GetUserDataResponse">
-    <part name="userData" type="xsd:string"/>
-  </message>
-  <portType name="VulnerablePort">
-    <operation name="GetUserData">
-      <input message="tns:GetUserDataRequest"/>
-      <output message="tns:GetUserDataResponse"/>
-    </operation>
-  </portType>
+<!-- 
+  =============================================================================
+  api/soap_wsdl.xml – TigerGate CNAPP Test: SOAP API Security
+  =============================================================================
+  PURPOSE: Demonstrates legacy SOAP API misconfigurations.
+  API SECURITY FINDINGS:
+    - API-SOAP-001: Missing WS-Security headers (No authentication)
+    - API-SOAP-002: Insecure transport (HTTP binding instead of HTTPS)
+    - API-SOAP-003: Potential for XML External Entity (XXE) injections
+  =============================================================================
+-->
+<definitions name="MegaCorpService"
+             targetNamespace="http://api.megacorp.internal/wsdl"
+             xmlns="http://schemas.xmlsoap.org/wsdl/"
+             xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
+             xmlns:tns="http://api.megacorp.internal/wsdl"
+             xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+
+    <message name="GetUserDataRequest">
+        <part name="userId" type="xsd:string"/>
+    </message>
+
+    <message name="GetUserDataResponse">
+        <!-- 🔴 VULN: Exposing PII (SSN, Email) in response without auth -->
+        <part name="ssn" type="xsd:string"/>
+        <part name="email" type="xsd:string"/>
+    </message>
+
+    <portType name="MegaCorpPortType">
+        <operation name="GetUserData">
+            <input message="tns:GetUserDataRequest"/>
+            <output message="tns:GetUserDataResponse"/>
+        </operation>
+    </portType>
+
+    <binding name="MegaCorpBinding" type="tns:MegaCorpPortType">
+        <!-- 🔴 VULN: Missing WS-Security (WSS) policy attachment. Unauthenticated parsing. -->
+        <soap:binding style="rpc" transport="http://schemas.xmlsoap.org/soap/http"/>
+        <operation name="GetUserData">
+            <soap:operation soapAction="GetUserData"/>
+            <input>
+                <!-- 🔴 VULN: Does not validate or require signed/encrypted XML -->
+                <soap:body use="encoded" namespace="urn:megacorp" encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"/>
+            </input>
+            <output>
+                <soap:body use="encoded" namespace="urn:megacorp" encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"/>
+            </output>
+        </operation>
+    </binding>
+
+    <service name="MegaCorpService">
+        <port name="MegaCorpPort" binding="tns:MegaCorpBinding">
+            <!-- 🔴 VULN: Service address is bound to unencrypted HTTP -->
+            <soap:address location="http://api.megacorp.internal/soap"/>
+        </port>
+    </service>
 </definitions>

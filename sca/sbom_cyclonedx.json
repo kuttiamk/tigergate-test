@@ -1,0 +1,198 @@
+{
+    "_comment": "TigerGate CNAPP – SBOM: CycloneDX Software Bill of Materials with intentionally vulnerable components",
+    "_purpose": "A CycloneDX SBOM containing known-vulnerable component versions. Triggers Trivy, Grype, and TigerGate SCA/SBOM findings. Use this to test SBOM ingestion and vulnerability correlation in your CNAPP platform.",
+    "bomFormat": "CycloneDX",
+    "specVersion": "1.4",
+    "version": 1,
+    "serialNumber": "urn:uuid:megacorp-app-sbom-2026",
+    "metadata": {
+        "timestamp": "2026-04-21T16:00:00Z",
+        "component": {
+            "type": "application",
+            "name": "MegaCorp Application Server",
+            "version": "3.2.1"
+        }
+    },
+    "components": [
+        {
+            "type": "library",
+            "group": "org.apache.logging.log4j",
+            "name": "log4j-core",
+            "version": "2.14.1",
+            "purl": "pkg:maven/org.apache.logging.log4j/log4j-core@2.14.1",
+            "vulnerabilities": [
+                "CVE-2021-44228"
+            ],
+            "_comment": "🔴 Log4Shell – CVSS 10.0 CRITICAL – RCE via JNDI injection"
+        },
+        {
+            "type": "library",
+            "group": "org.springframework",
+            "name": "spring-webmvc",
+            "version": "5.3.17",
+            "purl": "pkg:maven/org.springframework/spring-webmvc@5.3.17",
+            "vulnerabilities": [
+                "CVE-2022-22965"
+            ],
+            "_comment": "🔴 Spring4Shell – CVSS 9.8 CRITICAL – RCE via data binding"
+        },
+        {
+            "type": "library",
+            "name": "node-serialize",
+            "version": "0.0.4",
+            "purl": "pkg:npm/node-serialize@0.0.4",
+            "vulnerabilities": [
+                "CVE-2017-5941"
+            ],
+            "_comment": "🔴 node-serialize RCE – CVSS 9.8 CRITICAL – IIFE deserialization"
+        },
+        {
+            "type": "library",
+            "name": "lodash",
+            "version": "4.17.15",
+            "purl": "pkg:npm/lodash@4.17.15",
+            "vulnerabilities": [
+                "CVE-2021-23337",
+                "CVE-2020-8203"
+            ],
+            "_comment": "🔴 Prototype Pollution + Command Injection – CVSS 7.2 HIGH"
+        },
+        {
+            "type": "library",
+            "name": "express",
+            "version": "4.17.1",
+            "purl": "pkg:npm/express@4.17.1",
+            "_comment": "Outdated – known XSS and open redirect in older response handling"
+        },
+        {
+            "type": "library",
+            "name": "django",
+            "version": "2.2.0",
+            "purl": "pkg:pypi/django@2.2.0",
+            "vulnerabilities": [
+                "CVE-2021-44420",
+                "CVE-2022-28347"
+            ],
+            "_comment": "🔴 SQL Injection bypass + SQLi in QuerySet.annotate – HIGH"
+        },
+        {
+            "type": "library",
+            "name": "pillow",
+            "version": "8.1.0",
+            "purl": "pkg:pypi/pillow@8.1.0",
+            "vulnerabilities": [
+                "CVE-2021-27921",
+                "CVE-2021-34552"
+            ],
+            "_comment": "🔴 Remote DoS + Buffer overflow – CRITICAL for image processing apps"
+        },
+        {
+            "type": "library",
+            "name": "pyyaml",
+            "version": "5.3.1",
+            "purl": "pkg:pypi/pyyaml@5.3.1",
+            "vulnerabilities": [
+                "CVE-2020-14343"
+            ],
+            "_comment": "🔴 yaml.load() RCE – CVSS 9.8 CRITICAL – use yaml.safe_load()"
+        },
+        {
+            "type": "library",
+            "name": "openssl",
+            "version": "1.1.1l",
+            "purl": "pkg:generic/openssl@1.1.1l",
+            "vulnerabilities": [
+                "CVE-2022-0778"
+            ],
+            "_comment": "🔴 Infinite loop DoS – CVSS 7.5 HIGH – PEM certificate parsing"
+        },
+        {
+            "type": "library",
+            "name": "jackson-databind",
+            "version": "2.9.10",
+            "purl": "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.9.10",
+            "vulnerabilities": [
+                "CVE-2019-14379",
+                "CVE-2020-35491"
+            ],
+            "_comment": "🔴 Deserialization gadget chain – CVSS 9.8 CRITICAL"
+        },
+        {
+            "type": "library",
+            "name": "commons-text",
+            "version": "1.9",
+            "purl": "pkg:maven/org.apache.commons/commons-text@1.9",
+            "vulnerabilities": [
+                "CVE-2022-42889"
+            ],
+            "_comment": "🔴 Text4Shell – CVSS 9.8 CRITICAL – interpolation leading to RCE (similar to Log4Shell)"
+        },
+        {
+            "type": "library",
+            "name": "netty",
+            "version": "4.1.56.Final",
+            "purl": "pkg:maven/io.netty/netty-all@4.1.56.Final",
+            "vulnerabilities": [
+                "CVE-2021-21290"
+            ],
+            "_comment": "🔴 Temporary file creation in insecure directory – Info disclosure"
+        }
+    ],
+    "vulnerabilities": [
+        {
+            "id": "CVE-2021-44228",
+            "source": {
+                "name": "NVD",
+                "url": "https://nvd.nist.gov/vuln/detail/CVE-2021-44228"
+            },
+            "ratings": [
+                {
+                    "source": {
+                        "name": "NVD"
+                    },
+                    "score": 10.0,
+                    "severity": "critical",
+                    "method": "CVSSv3"
+                }
+            ],
+            "description": "Log4Shell: Apache Log4j2 JNDI features used in configuration, log messages and parameters do not protect against attacker controlled LDAP and other JNDI related endpoints.",
+            "affects": [
+                {
+                    "ref": "pkg:maven/org.apache.logging.log4j/log4j-core@2.14.1"
+                }
+            ]
+        },
+        {
+            "id": "CVE-2022-22965",
+            "ratings": [
+                {
+                    "score": 9.8,
+                    "severity": "critical",
+                    "method": "CVSSv3"
+                }
+            ],
+            "description": "Spring4Shell: Spring MVC or Spring WebFlux application running on JDK 9+ may be vulnerable to remote code execution (RCE) via data binding.",
+            "affects": [
+                {
+                    "ref": "pkg:maven/org.springframework/spring-webmvc@5.3.17"
+                }
+            ]
+        },
+        {
+            "id": "CVE-2022-42889",
+            "ratings": [
+                {
+                    "score": 9.8,
+                    "severity": "critical",
+                    "method": "CVSSv3"
+                }
+            ],
+            "description": "Text4Shell: Apache Commons Text performs variable interpolation, allowing properties to be dynamically evaluated and expanded. RCE possible.",
+            "affects": [
+                {
+                    "ref": "pkg:maven/org.apache.commons/commons-text@1.9"
+                }
+            ]
+        }
+    ]
+}
