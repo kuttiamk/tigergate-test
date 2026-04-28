@@ -311,58 +311,58 @@ clean:
 # GIT HOOKS
 # ════════════════════════════════════════════════════════════════════════════
 install-hooks:
-@echo -e "$(CYAN)Installing pre-commit hooks...$(NC)"
-@cp hooks/pre-commit .git/hooks/pre-commit
-@chmod +x .git/hooks/pre-commit
-@echo -e "$(GREEN)✓ Pre-commit hook installed. Will run on every commit.$(NC)"
+	@echo -e "$(CYAN)Installing pre-commit hooks...$(NC)"
+	@cp hooks/pre-commit .git/hooks/pre-commit
+	@chmod +x .git/hooks/pre-commit
+	@echo -e "$(GREEN)✓ Pre-commit hook installed. Will run on every commit.$(NC)"
 
 # ════════════════════════════════════════════════════════════════════════════
 # DASHBOARD
 # ════════════════════════════════════════════════════════════════════════════
 open-dashboard:
-@echo -e "$(CYAN)Opening Security Coverage Dashboard...$(NC)"
-@xdg-open dashboard.html 2>/dev/null || open dashboard.html 2>/dev/null || \
+	@echo -e "$(CYAN)Opening Security Coverage Dashboard...$(NC)"
+	@xdg-open dashboard.html 2>/dev/null || open dashboard.html 2>/dev/null || \
     echo "Open dashboard.html in your browser: file://$(ROOT_DIR)/dashboard.html"
 
 # ════════════════════════════════════════════════════════════════════════════
 # ADDITIONAL SCANNERS
 # ════════════════════════════════════════════════════════════════════════════
 scan-gitleaks:
-@echo -e "$(CYAN)Running Gitleaks secrets scanner...$(NC)"
-@docker run --rm -v $(ROOT_DIR):/path \
-    zricethezav/gitleaks:latest detect --source=/path -v --no-git || true
-@echo -e "$(GREEN)✓ Gitleaks scan complete.$(NC)"
+	@echo -e "$(CYAN)Running Gitleaks secrets scanner...$(NC)"
+	@docker run --rm -v $(ROOT_DIR):/path \
+	    zricethezav/gitleaks:latest detect --source=/path -v --no-git || true
+	@echo -e "$(GREEN)✓ Gitleaks scan complete.$(NC)"
 
 scan-semgrep:
-@echo -e "$(CYAN)Running Semgrep SAST (multi-language)...$(NC)"
-@docker run --rm \
-    -v $(ROOT_DIR):/src \
-    semgrep/semgrep:latest semgrep \
-    --config auto \
-    --severity ERROR \
-    --output /dev/stdout \
-    /src/nodejs /src/python /src/php /src/sast_advanced || true
-@echo -e "$(GREEN)✓ Semgrep scan complete.$(NC)"
+	@echo -e "$(CYAN)Running Semgrep SAST (multi-language)...$(NC)"
+	@docker run --rm \
+	    -v $(ROOT_DIR):/src \
+	    semgrep/semgrep:latest semgrep \
+	    --config auto \
+	    --severity ERROR \
+	    --output /dev/stdout \
+	    /src/nodejs /src/python /src/php /src/sast_advanced || true
+	@echo -e "$(GREEN)✓ Semgrep scan complete.$(NC)"
 
 scan-trivy-sca:
-@echo -e "$(CYAN)Running Trivy SCA (package vulnerability scan)...$(NC)"
-@docker run --rm -v $(ROOT_DIR):/src \
-    aquasec/trivy:latest fs /src/sca \
-    --severity HIGH,CRITICAL \
-    --format table || true
-@echo -e "$(GREEN)✓ Trivy SCA scan complete.$(NC)"
+	@echo -e "$(CYAN)Running Trivy SCA (package vulnerability scan)...$(NC)"
+	@docker run --rm -v $(ROOT_DIR):/src \
+	    aquasec/trivy:latest fs /src/sca \
+	    --severity HIGH,CRITICAL \
+	    --format table || true
+	@echo -e "$(GREEN)✓ Trivy SCA scan complete.$(NC)"
 
 attack-advanced:
-@echo -e "$(RED)WARNING: Running advanced CWPP attack simulation (T001–T005).$(NC)"
-@echo -e "$(YELLOW)TigerGate eBPF sensors should fire – docker socket, DNS tunnel, cron, miner patterns.$(NC)"
-@chmod +x cwpp/runtime/runtime_attack_advanced.sh
-@bash cwpp/runtime/runtime_attack_advanced.sh
+	@echo -e "$(RED)WARNING: Running advanced CWPP attack simulation (T001–T005).$(NC)"
+	@echo -e "$(YELLOW)TigerGate eBPF sensors should fire – docker socket, DNS tunnel, cron, miner patterns.$(NC)"
+	@chmod +x cwpp/runtime/runtime_attack_advanced.sh
+	@bash cwpp/runtime/runtime_attack_advanced.sh
 
 # Override scan-all to include all new scanners
 scan-all: scan-checkov scan-tfsec scan-hadolint scan-kubesec scan-gitleaks scan-trivy-sca
-@echo ""
-@echo -e "$(GREEN)════════════════════════════════════════════════════════════$(NC)"
-@echo -e "$(GREEN)  All security scans complete! Check results above.$(NC)"
-@echo -e "$(GREEN)════════════════════════════════════════════════════════════$(NC)"
-@$(MAKE) count-vulns
+	@echo ""
+	@echo -e "$(GREEN)════════════════════════════════════════════════════════════$(NC)"
+	@echo -e "$(GREEN)  All security scans complete! Check results above.$(NC)"
+	@echo -e "$(GREEN)════════════════════════════════════════════════════════════$(NC)"
+	@$(MAKE) count-vulns
 
