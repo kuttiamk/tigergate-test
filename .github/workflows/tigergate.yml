@@ -1,35 +1,28 @@
-# name: TigerGate Security Scan
+name: TigerGate Security Scan
 
-# on:
-#   push:
-#     branches: [main, master, develop]
-#   pull_request:
-#     branches: [main, master, develop]
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
 
-# env:
-#   TIGERGATE_API_KEY: ${{ secrets.TIGERGATE_API_KEY }}
-#   TIGERGATE_API_URL: https://api.tigergate.dev/api/ci
+env:
+  TIGERGATE_API_KEY: ${{ secrets.TIGERGATE_API_KEY }}
 
-# jobs:
-#   code-security:
-#     name: Code Security Scan
-#     runs-on: ubuntu-latest
+jobs:
+  code-security:
+    name: Code Security Scan
+    runs-on: ubuntu-latest
+    container:
+      image: tigergate/tigergate-cli:1.0.0     # or :latest
 
-#     steps:
-#       - name: Checkout Repository
-#         uses: actions/checkout@v4
+    steps:
+      - uses: actions/checkout@v4
 
-#       - name: Install TigerGate CLI
-#         run: |
-#           curl -fsSL https://download.tigergate.dev/code-security/latest/tigergate-cli.tar.gz -o tigergate-cli.tar.gz
-#           tar -xzf tigergate-cli.tar.gz
-#           chmod +x tigergate-cli
-#           sudo mv tigergate-cli /usr/local/bin/
-
-#       - name: Run Security Scan
-#         run: |
-#           tigergate-cli scan \
-#             --type all \
-#             --fail-on critical,high \
-#             --quality-gate \
-#             --upload
+      - name: Run Security Scan
+        run: |
+          tigergate scan \
+            --type all \
+            --fail-on critical,high \
+            --quality-gate \
+            --upload
