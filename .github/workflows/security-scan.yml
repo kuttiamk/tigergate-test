@@ -1,0 +1,357 @@
+name: "🔐 TigerGate Security Scan Pipeline"
+# =============================================================================
+# .github/workflows/security-scan.yml – TigerGate CNAPP DevSecOps Pipeline
+# =============================================================================
+# PURPOSE: Production-grade shift-left security pipeline that:
+#   1. Scans secrets (Gitleaks)
+#   2. Runs SAST (Semgrep)
+#   3. Scans IaC (Checkov)
+#   4. Scans containers (Trivy + Hadolint)
+#   5. Scans dependencies/SCA (Trivy fs)
+#   6. Generates compliance summary report
+#
+# All stages use exit-code:0 / soft_fail:true because this is an INTENTIONALLY
+# insecure test repository — scanners WILL find issues by design.
+# Results are uploaded to GitHub Security tab (SARIF) for review.
+# =============================================================================
+
+on:
+  push:
+    branches: [main, develop, "feature/*"]
+  pull_request:
+    branches: [main, develop]
+
+# Minimal permissions — only what each job actually needs
+permissions:
+  contents: read
+  security-events: write   # Required for SARIF upload to GitHub Security tab
+  pull-requests: write     # Required to post PR comments with findings summary
+
+jobs:
+  # ── Stage 1: Secrets Detection (Gitleaks) ────────────────────────────────
+  secrets-scan:
+    name: "1/5 Secrets Scan (Gitleaks)"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # Full history needed for commit-based secret scanning
+
+      - name: Install Gitleaks
+        run: |
+          wget -q https://github.com/gitleaks/gitleaks/releases/download/v8.18.4/gitleaks_8.18.4_linux_x64.tar.gz
+          tar -xzf gitleaks_8.18.4_linux_x64.tar.gz gitleaks
+          chmod +x gitleaks
+          sudo mv gitleaks /usr/local/bin/
+
+      - name: Run Gitleaks (report only — intentional secrets expected)
+        run: |
+          gitleaks detect \
+            --source . \
+            --config secrets/gitleaks.toml \
+            --no-git \
+            --report-format json \
+            --report-path gitleaks-report.json \
+            --exit-code 0 \
+            --verbose 2>&1 || true
+          echo "=== Gitleaks Results ==="
+          if [ -f gitleaks-report.json ]; then
+            FINDINGS=$(python3 -c "import json,sys; d=json.load(open('gitleaks-report.json')); print(len(d) if isinstance(d,list) else 0)" 2>/dev/null || echo "0")
+            echo "Secrets found: $FINDINGS (expected — this is an intentional test repo)"
+          fi
+
+      - name: Upload Gitleaks report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gitleaks-report
+          path: gitleaks-report.json
+
+  # ── Stage 2: SAST (Semgrep) ───────────────────────────────────────────────
+  sast:
+    name: "2/5 SAST (Semgrep)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Semgrep
+        run: pip install semgrep --quiet
+
+      - name: Run Semgrep SAST
+        run: |
+          semgrep \
+            --config p/python \
+            --config p/javascript \
+            --config p/php \
+            --config p/owasp-top-ten \
+            --metrics=off \
+            --quiet \
+            --json \
+            --output semgrep-results.json \
+            . 2>/dev/null || true
+          echo "=== Semgrep Results ==="
+          if [ -f semgrep-results.json ]; then
+            COUNT=$(python3 -c "import json; d=json.load(open('semgrep-results.json')); print(len(d.get('results',[])))" 2>/dev/null || echo "0")
+            echo "SAST findings: $COUNT (expected — intentionally vulnerable code)"
+          fi
+
+      - name: Convert to SARIF and upload
+        run: |
+          # Convert JSON to minimal SARIF for GitHub Security tab
+          python3 << 'EOF'
+          import json, sys
+          try:
+            with open('semgrep-results.json') as f:
+              data = json.load(f)
+            results = data.get('results', [])
+            sarif = {
+              "version": "2.1.0",
+              "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+              "runs": [{
+                "tool": {"driver": {"name": "Semgrep", "version": "1.0", "rules": []}},
+                "results": [{
+                  "ruleId": r.get("check_id", "unknown"),
+                  "message": {"text": r.get("extra", {}).get("message", "")},
+                  "locations": [{"physicalLocation": {"artifactLocation": {"uri": r.get("path","")}, "region": {"startLine": r.get("start",{}).get("line",1)}}}],
+                  "level": "warning"
+                } for r in results[:100]]
+              }]
+            }
+            with open('semgrep.sarif', 'w') as f:
+              json.dump(sarif, f)
+            print(f"Generated SARIF with {len(results)} findings")
+          except Exception as e:
+            print(f"SARIF generation skipped: {e}")
+            with open('semgrep.sarif', 'w') as f:
+              json.dump({"version":"2.1.0","$schema":"https://json.schemastore.org/sarif-2.1.0.json","runs":[{"tool":{"driver":{"name":"Semgrep","rules":[]}},"results":[]}]}, f)
+          EOF
+
+      - name: Upload SARIF to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep
+
+      - name: Upload Semgrep report artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: semgrep-report
+          path: semgrep-results.json
+
+  # ── Stage 3: IaC Security (Checkov) ──────────────────────────────────────
+  iac-scan:
+    name: "3/5 IaC Security (Checkov)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Checkov
+        run: pip install checkov --quiet
+
+      - name: Run Checkov on Terraform
+        run: |
+          checkov \
+            --directory . \
+            --framework terraform cloudformation kubernetes \
+            --output json \
+            --output-file-path checkov-results.json \
+            --soft-fail \
+            --compact \
+            --quiet 2>/dev/null || true
+          echo "=== Checkov Results ==="
+          if [ -f checkov-results.json ]; then
+            python3 -c "
+          import json, glob
+          total_fail = 0
+          for f in glob.glob('checkov-results*.json'):
+              try:
+                  d = json.load(open(f))
+                  if isinstance(d, list):
+                      for item in d:
+                          total_fail += len(item.get('results',{}).get('failed_checks',[]))
+                  elif isinstance(d, dict):
+                      total_fail += len(d.get('results',{}).get('failed_checks',[]))
+              except: pass
+          print(f'IaC violations found: {total_fail} (expected — intentionally misconfigured)')
+          " 2>/dev/null || echo "Results generated"
+          fi
+
+      - name: Run Checkov SARIF output
+        run: |
+          checkov \
+            --directory cspm/ \
+            --framework terraform \
+            --output sarif \
+            --output-file-path checkov.sarif \
+            --soft-fail \
+            --compact \
+            --quiet 2>/dev/null || true
+          # Ensure a valid SARIF exists even if checkov didn't produce one
+          if [ ! -f checkov.sarif ] || [ ! -s checkov.sarif ]; then
+            echo '{"version":"2.1.0","$schema":"https://json.schemastore.org/sarif-2.1.0.json","runs":[{"tool":{"driver":{"name":"Checkov","rules":[]}},"results":[]}]}' > checkov.sarif
+          fi
+
+      - name: Upload Checkov SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: checkov.sarif
+          category: checkov
+
+      - name: Upload Checkov full report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: checkov-report
+          path: checkov-results*.json
+
+  # ── Stage 4: Container & Dependency Scan (Trivy + Hadolint) ─────────────
+  container-scan:
+    name: "4/5 Container & SCA (Trivy + Hadolint)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Trivy
+        run: |
+          wget -q https://github.com/aquasecurity/trivy/releases/download/v0.57.1/trivy_0.57.1_Linux-64bit.tar.gz
+          tar -xzf trivy_0.57.1_Linux-64bit.tar.gz trivy
+          sudo mv trivy /usr/local/bin/
+
+      - name: Run Trivy filesystem SCA scan
+        run: |
+          trivy fs . \
+            --format json \
+            --output trivy-fs-results.json \
+            --severity HIGH,CRITICAL \
+            --exit-code 0 \
+            --quiet 2>/dev/null || true
+          echo "=== Trivy SCA Results ==="
+          python3 -c "
+          import json
+          try:
+              d = json.load(open('trivy-fs-results.json'))
+              total = sum(len(r.get('Vulnerabilities') or []) for r in d.get('Results',[]))
+              print(f'CVEs found: {total} (expected — intentionally vulnerable dependencies)')
+          except Exception as e:
+              print(f'Results: see artifact (parse error: {e})')
+          " 2>/dev/null || true
+
+      - name: Generate Trivy SARIF
+        run: |
+          trivy fs . \
+            --format sarif \
+            --output trivy.sarif \
+            --severity HIGH,CRITICAL \
+            --exit-code 0 \
+            --quiet 2>/dev/null || \
+          echo '{"version":"2.1.0","$schema":"https://json.schemastore.org/sarif-2.1.0.json","runs":[{"tool":{"driver":{"name":"Trivy","rules":[]}},"results":[]}]}' > trivy.sarif
+
+      - name: Upload Trivy SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy.sarif
+          category: trivy
+
+      - name: Install Hadolint
+        run: |
+          wget -q -O hadolint https://github.com/hadolint/hadolint/releases/download/v2.12.0/hadolint-Linux-x86_64
+          chmod +x hadolint && sudo mv hadolint /usr/local/bin/
+
+      - name: Dockerfile Lint (Hadolint)
+        run: |
+          echo "=== Hadolint Dockerfile Analysis ==="
+          find . -name "Dockerfile*" \
+            -not -path './.git/*' \
+            -not -path './node_modules/*' | while read df; do
+            ISSUES=$(hadolint --format json "$df" 2>/dev/null | python3 -c "import json,sys; print(len(json.load(sys.stdin)))" 2>/dev/null || echo "?")
+            echo "  $df: $ISSUES issues"
+          done
+
+      - name: Upload SCA report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: trivy-sca-report
+          path: trivy-fs-results.json
+
+  # ── Stage 5: Compliance Summary Report ───────────────────────────────────
+  compliance-report:
+    name: "5/5 Compliance Summary"
+    runs-on: ubuntu-latest
+    needs: [secrets-scan, sast, iac-scan, container-scan]
+    if: always()   # Run even if earlier stages fail
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Count vulnerability markers
+        run: |
+          echo "=== TigerGate Compliance Summary ===" | tee compliance-report.md
+          echo "" | tee -a compliance-report.md
+          echo "**Date**: $(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a compliance-report.md
+          echo "**Commit**: $GITHUB_SHA" | tee -a compliance-report.md
+          echo "**Branch**: $GITHUB_REF_NAME" | tee -a compliance-report.md
+          echo "" | tee -a compliance-report.md
+
+          # Count markers
+          TOTAL=$(grep -r "🔴" . \
+            --include="*.py" --include="*.js" --include="*.tf" \
+            --include="*.yaml" --include="*.yml" --include="*.sh" \
+            --include="*.php" --include="*.java" \
+            --exclude-dir=".git" --exclude-dir="node_modules" \
+            2>/dev/null | wc -l)
+          FILES=$(grep -r "🔴" . \
+            --include="*.py" --include="*.js" --include="*.tf" \
+            --include="*.yaml" --include="*.yml" --include="*.sh" \
+            --include="*.php" --include="*.java" \
+            --exclude-dir=".git" --exclude-dir="node_modules" \
+            -l 2>/dev/null | wc -l)
+
+          echo "## Coverage Summary" | tee -a compliance-report.md
+          echo "" | tee -a compliance-report.md
+          echo "| Metric | Value |" | tee -a compliance-report.md
+          echo "|--------|-------|" | tee -a compliance-report.md
+          echo "| Vulnerability Markers (🔴) | $TOTAL |" | tee -a compliance-report.md
+          echo "| Files with Findings | $FILES |" | tee -a compliance-report.md
+          echo "| CNAPP Pillars Covered | 18 |" | tee -a compliance-report.md
+          echo "| Cloud Providers | 4 (AWS, Azure, GCP, Oracle) |" | tee -a compliance-report.md
+          echo "| Industry Verticals | 4 (FinTech, Healthcare, Gov, Startup) |" | tee -a compliance-report.md
+          echo "" | tee -a compliance-report.md
+          echo "## Compliance Status (All INTENTIONAL FAILURES)" | tee -a compliance-report.md
+          echo "" | tee -a compliance-report.md
+          echo "| Framework | Status | Location |" | tee -a compliance-report.md
+          echo "|-----------|--------|----------|" | tee -a compliance-report.md
+          echo "| PCI-DSS v4.0 | ❌ FAIL | industry/fintech/ |" | tee -a compliance-report.md
+          echo "| HIPAA Security Rule | ❌ FAIL | industry/healthcare/ |" | tee -a compliance-report.md
+          echo "| FedRAMP Moderate | ❌ FAIL | industry/government/ |" | tee -a compliance-report.md
+          echo "| CIS AWS Benchmark | ❌ FAIL | cspm/aws_insecure.tf |" | tee -a compliance-report.md
+          echo "| CIS K8s Benchmark | ❌ FAIL | kspm/ |" | tee -a compliance-report.md
+          echo "| OWASP Top 10 | ❌ FAIL | sast_advanced/, python/, nodejs/ |" | tee -a compliance-report.md
+          echo "| SOC 2 Type II | ❌ FAIL | secrets/, dspm/ |" | tee -a compliance-report.md
+          echo "" | tee -a compliance-report.md
+          echo "> ⚠️ All failures are intentional — this is a CNAPP scanner test suite." | tee -a compliance-report.md
+          cat compliance-report.md
+
+      - name: Upload compliance report
+        uses: actions/upload-artifact@v4
+        with:
+          name: compliance-report
+          path: compliance-report.md
+
+      - name: Post PR Summary
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('compliance-report.md', 'utf8');
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## 🔐 TigerGate Security Scan Results\n\n${report}\n\n*Results uploaded to [Security tab](https://github.com/${context.repo.owner}/${context.repo.repo}/security/code-scanning)*`
+            });

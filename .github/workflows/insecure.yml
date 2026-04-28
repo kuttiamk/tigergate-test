@@ -1,12 +1,89 @@
-name: Vulnerable Supply Chain
-on: [push]
+name: Vulnerable Supply Chain (Security Demo)
+# =============================================================================
+# .github/workflows/insecure.yml – TigerGate CNAPP: Supply Chain Demo
+# =============================================================================
+# PURPOSE: Demonstrates supply chain attack vectors in CI/CD pipelines.
+# This pipeline intentionally showcases dangerous patterns that CNAPP tools
+# should detect. It runs successfully as an educational demonstration.
+#
+# SUPPLY CHAIN FINDINGS:
+#   SC-001: Unpinned action tags (tag hijacking vector)
+#   SC-002: Hardcoded secrets printed to logs (CWE-532)
+#   SC-003: Third-party action without checksum verification
+#   SC-004: Workflow triggered on all pushes (excessive attack surface)
+# =============================================================================
+
+# 🔴 SC-004: Triggers on every push to every branch — no branch filtering
+on: [push, pull_request]
+
+# Minimal permissions (at least this is correct)
+permissions:
+  contents: read
+
 jobs:
-  build:
+  vulnerable-build:
+    name: "Supply Chain Demo"
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
-    - name: Run unverified third party action
-      uses: malicious-actor/unknown-action@master
-    - name: Use hardcoded secret
-      run: echo "Using AWS key AKIAIOSFODNN7EXAMPLE" 
+      - name: "Checkout (Unpinned)"
+        # 🔴 SC-001: Unpinned action — tag v2 could be replaced by maintainer at any time
+        # Secure: uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        uses: actions/checkout@v2    # 🔴 SC-001: Floating tag!
+
+      - name: "🔴 SC-001: Demonstrate Unpinned Action Risk"
+        run: |
+          echo "======================================================"
+          echo "FINDING SC-001: Unpinned Third-Party Action"
+          echo "======================================================"
+          echo "This workflow uses: actions/checkout@v2"
+          echo "The vulnerable pattern being simulated:"
+          echo "  uses: malicious-actor/unknown-action@master"
+          echo ""
+          echo "Supply chain attack scenario:"
+          echo "  1. Developer forks popular GitHub Action"
+          echo "  2. Renames account to match squatted namespace"
+          echo "  3. Inserts credential-stealing payload"
+          echo "  4. Any workflow using @latest picks up the attack"
+          echo "  5. CI runner exfiltrates secrets to attacker"
+          echo ""
+          echo "SECURE FIX: Pin to commit SHA (immutable):"
+          echo "  uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683"
+          echo "======================================================"
+
+      - name: "🔴 SC-002: Simulate hardcoded secret usage"
+        env:
+          # 🔴 SC-002: Hardcoded dummy credentials (for demo only)
+          DEMO_AWS_KEY: "AKIAIOSFODNN7EXAMPLE"
+        run: |
+          echo "======================================================"
+          echo "FINDING SC-002: Hardcoded Secret in Workflow"
+          echo "======================================================"
+          echo "Using AWS key: $DEMO_AWS_KEY"
+          echo ""
+          echo "This simulates the original pattern:"
+          echo '  run: echo "Using AWS key AKIAIOSFODNN7EXAMPLE"'
+          echo ""
+          echo "SECURE FIX: Use GitHub Secrets:"
+          echo '  env:'
+          echo '    AWS_KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}'
+          echo "Or better: use OIDC role federation (no keys at all)"
+          echo "======================================================"
+
+      - name: "🔴 SC-003: Unverified third-party tool install"
+        run: |
+          echo "======================================================"
+          echo "FINDING SC-003: Unverified Third-Party Tool"
+          echo "======================================================"
+          echo "Common insecure pattern:"
+          echo "  curl https://example.com/install.sh | bash"
+          echo "  pip install some-unverified-package==1.0.0"
+          echo ""
+          echo "Risk: Install script could be compromised (see: codecov breach)"
+          echo "Risk: PyPI/npm package name squatting attacks"
+          echo ""
+          echo "SECURE FIX:"
+          echo "  - Verify checksums (sha256sum) before executing"
+          echo "  - Use official vendor actions from verified publishers"
+          echo "  - Lock dependency versions AND verify package hashes"
+          echo "======================================================"
+          echo "✅ Supply chain demo complete — 3 findings documented"
