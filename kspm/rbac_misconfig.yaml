@@ -1,0 +1,99 @@
+# =============================================================================
+# kspm/rbac_misconfig.yaml — TigerGate CNAPP: KSPM – RBAC Misconfigurations
+# =============================================================================
+# PURPOSE: Demonstrates dangerous Kubernetes RBAC patterns that give attackers
+# broad cluster access. A compromised pod with these permissions can pivot to
+# steal secrets, create backdoor accounts, or escape to the host.
+#
+# KSPM FINDINGS:
+#   RBAC-001: ClusterRole with wildcard (*) on all resources and verbs (CIS K8s 5.1.1)
+#   RBAC-002: ClusterRoleBinding assigns cluster-admin to a default service account
+#   RBAC-003: ServiceAccount with automountServiceAccountToken: true (default)
+#   RBAC-004: RoleBinding grants secrets 'get' to all service accounts (*)
+#   RBAC-005: ClusterRole allows escalate/bind verbs → privilege escalation path
+# =============================================================================
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: insecure-wildcard-role
+  annotations:
+    # 🔴 RBAC-001: This role grants EVERYTHING to whoever holds it
+    tigergate.io/finding: "RBAC-001 wildcard ClusterRole"
+rules:
+  - apiGroups: ["*"]     # 🔴 ALL API groups — core, apps, rbac, storage, everything
+    resources: ["*"]     # 🔴 ALL resource types — pods, secrets, nodes, PVs...
+    verbs:     ["*"]     # 🔴 ALL verbs — get, list, create, delete, exec, escalate
+# Correct approach: specify only the exact apiGroup/resource/verb needed
+# rules:
+#   - apiGroups: ["apps"]
+#     resources: ["deployments"]
+#     verbs: ["get", "list"]
+
+---
+# 🔴 RBAC-002: cluster-admin bound to default service account in default namespace
+# Any pod running without an explicit serviceAccountName gets this binding!
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: insecure-default-admin-binding
+subjects:
+  - kind: ServiceAccount
+    name: default                  # 🔴 RBAC-002: The "default" SA used by ALL pods!
+    namespace: default
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin              # 🔴 RBAC-002: cluster-admin = root on entire cluster
+  apiGroup: rbac.authorization.k8s.io
+# Impact: Any pod in 'default' namespace can: kubectl get secrets --all-namespaces,
+# kubectl exec into any pod, delete deployments, create backdoor admin users.
+
+---
+# 🔴 RBAC-003: ServiceAccount with automounted token (default behavior)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: app-service-account
+  namespace: production
+# automountServiceAccountToken: false  ← NOT SET (defaults to true)
+# 🔴 RBAC-003: Token auto-mounted at /var/run/secrets/kubernetes.io/serviceaccount/token
+# If container is compromised, attacker reads the token and calls K8s API directly
+
+---
+# 🔴 RBAC-004: Grant 'secrets' read access to ALL service accounts
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: all-secrets-reader
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]         # 🔴 RBAC-004: Can read ALL secrets cluster-wide
+    verbs: ["get", "list", "watch"]
+# This includes: DB passwords, TLS certs, cloud provider credentials, API keys
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: all-secrets-reader-binding
+subjects:
+  - kind: Group
+    name: "system:serviceaccounts" # 🔴 ALL service accounts can read ALL secrets!
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: all-secrets-reader
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# 🔴 RBAC-005: Role that allows privilege escalation via escalate/bind verbs
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: privilege-escalation-role
+rules:
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["clusterroles", "roles"]
+    verbs: ["escalate", "bind", "create", "update"]
+    # 🔴 RBAC-005: 'escalate' allows granting roles with higher privileges than you have
+    # 🔴 RBAC-005: 'bind' allows binding any ClusterRole to any subject
+    # Together: attacker binds cluster-admin to themselves even if they weren't admin

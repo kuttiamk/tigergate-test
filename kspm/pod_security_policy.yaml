@@ -1,0 +1,93 @@
+# =============================================================================
+# kspm/pod_security_policy.yaml — TigerGate CNAPP: KSPM – Pod Security
+# =============================================================================
+# PURPOSE: Demonstrates insecure pod configurations that allow container escape,
+# host access, and privilege escalation. Based on CIS K8s Benchmark §5.2
+# and NSA/CISA Kubernetes Hardening Guide.
+#
+# KSPM FINDINGS:
+#   PSP-001: Container runs as root (runAsNonRoot: false)
+#   PSP-002: Privileged mode enabled (host kernel access)
+#   PSP-003: hostPath volume mounts Docker socket (full host escape!)
+#   PSP-004: No seccomp profile (all 300+ syscalls available)
+#   PSP-005: No readOnlyRootFilesystem (attacker can write persistence)
+#   PSP-006: Capabilities not dropped (NET_RAW, SYS_ADMIN, etc. available)
+#   PSP-007: hostNetwork + hostPID enabled (see host processes and networking)
+# =============================================================================
+apiVersion: v1
+kind: Pod
+metadata:
+  name: insecure-privileged-pod
+  namespace: production
+  annotations:
+    tigergate.io/finding: "PSP-001 through PSP-007"
+spec:
+  # 🔴 PSP-007: Pod can see ALL host network interfaces and ports
+  hostNetwork: true
+  # 🔴 PSP-007: Pod can see ALL host processes (ps aux shows everything)
+  hostPID: true
+  hostIPC: true
+
+  volumes:
+    # 🔴 PSP-003: Mounts Docker socket — full container escape!
+    # With /var/run/docker.sock the pod can: docker run -v /:/host --privileged ubuntu chroot /host
+    - name: docker-socket
+      hostPath:
+        path: /var/run/docker.sock   # 🔴 PSP-003: CRITICAL: Docker socket = root on host!
+    # 🔴 PSP-003: Mounts entire host filesystem
+    - name: host-root
+      hostPath:
+        path: /                       # 🔴 The ENTIRE host root filesystem!
+
+  containers:
+    - name: insecure-container
+      image: ubuntu:latest            # 🔴 Unpinned :latest tag
+      command: ["sleep", "infinity"]
+
+      # 🔴 PSP-002: Fully privileged — bypasses ALL Linux namespace isolation
+      securityContext:
+        privileged: true              # 🔴 PSP-002: CRITICAL: Same as running directly on host!
+        runAsUser: 0                  # 🔴 PSP-001: Running as root (UID 0)
+        runAsNonRoot: false           # 🔴 PSP-001: Explicitly allows root
+        readOnlyRootFilesystem: false # 🔴 PSP-005: Attacker can write files (malware, cron)
+        allowPrivilegeEscalation: true # 🔴 Allows setuid binaries to escalate privileges
+        # 🔴 PSP-006: No capabilities drop — container has:
+        # NET_RAW (can sniff network), SYS_ADMIN (mount filesystems), SYS_PTRACE (debug procs)
+        # capabilities:
+        #   drop: ["ALL"]   ← NOT SET — should drop ALL, then add only what's needed
+
+      # 🔴 PSP-004: No seccomp profile — all Linux syscalls available
+      # securityContext.seccompProfile: RuntimeDefault   ← NOT SET
+
+      volumeMounts:
+        - name: docker-socket
+          mountPath: /var/run/docker.sock   # 🔴 PSP-003: Docker socket accessible in container
+        - name: host-root
+          mountPath: /host                  # 🔴 Full host filesystem at /host
+
+      # 🔴 No resource limits — container can exhaust all host CPU/Memory (DoS)
+      # resources:
+      #   limits: { cpu: "500m", memory: "512Mi" }   ← NOT SET
+
+---
+# What a SECURE pod looks like (for comparison):
+# apiVersion: v1
+# kind: Pod
+# metadata:
+#   name: secure-pod
+# spec:
+#   securityContext:
+#     runAsNonRoot: true
+#     runAsUser: 1000
+#     seccompProfile:
+#       type: RuntimeDefault
+#   containers:
+#   - name: app
+#     image: myapp:sha256-abc123    # Pinned digest
+#     securityContext:
+#       readOnlyRootFilesystem: true
+#       allowPrivilegeEscalation: false
+#       capabilities:
+#         drop: ["ALL"]
+#     resources:
+#       limits: { cpu: "500m", memory: "256Mi" }
