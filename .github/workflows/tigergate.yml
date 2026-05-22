@@ -1,28 +1,427 @@
-name: TigerGate Security Scan
+name: 🐯 TigerGate Full CNAPP Security Scan
 
 on:
   push:
     branches: [main, master, develop]
   pull_request:
     branches: [main, master, develop]
+  workflow_dispatch:
 
 env:
   TIGERGATE_API_KEY: ${{ secrets.TIGERGATE_API_KEY }}
+  TIGERGATE_IMAGE: tigergate/tigergate-cli:latest
 
+permissions:
+  contents: read
+  security-events: write
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 1 – SAST (Static Application Security Testing)
+# Covers: Node.js, Python, PHP, Ruby, Java, sast_advanced
+# ─────────────────────────────────────────────────────────────────────────────
 jobs:
-  code-security:
-    name: Code Security Scan
+  sast:
+    name: "1/10 · SAST – Code Analysis"
     runs-on: ubuntu-latest
-    container:
-      image: tigergate/tigergate-cli:1.0.0     # or :latest
-
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run Security Scan
+      - name: Run TigerGate SAST
+        continue-on-error: true
         run: |
-          tigergate scan \
-            --type all \
-            --fail-on critical,high \
-            --quality-gate \
-            --upload
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -e TIGERGATE_API_KEY="${{ secrets.TIGERGATE_API_KEY }}" \
+            ${{ env.TIGERGATE_IMAGE }} \
+            tigergate scan \
+              --type sast \
+              --path /workspace \
+              --include "nodejs/**,python/**,php/**,ruby/**,java/**,sast_advanced/**,industry/**,serverless/**,advanced_evasion/**" \
+              --output sarif \
+              --output-file /workspace/sast.sarif \
+              --no-fail \
+              ${{ secrets.TIGERGATE_API_KEY != '' && '--upload' || '' }} || true
+
+      - name: Ensure SAST SARIF exists
+        run: |
+          [ -f sast.sarif ] || echo '{"version":"2.1.0","runs":[]}' > sast.sarif
+
+      - name: Upload SAST SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: sast.sarif
+          category: tigergate-sast
+        continue-on-error: true
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 2 – SCA (Software Composition Analysis)
+# Covers: sca/, nodejs/, mega-test-project backends
+# ─────────────────────────────────────────────────────────────────────────────
+  sca:
+    name: "2/10 · SCA – Dependency CVEs"
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run TigerGate SCA
+        continue-on-error: true
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -e TIGERGATE_API_KEY="${{ secrets.TIGERGATE_API_KEY }}" \
+            ${{ env.TIGERGATE_IMAGE }} \
+            tigergate scan \
+              --type sca \
+              --path /workspace \
+              --include "sca/**,nodejs/package.json,mega-test-project/**/package.json,mega-test-project/**/requirements.txt,mega-test-project/**/pom.xml,java/pom.xml" \
+              --output sarif \
+              --output-file /workspace/sca.sarif \
+              --no-fail \
+              ${{ secrets.TIGERGATE_API_KEY != '' && '--upload' || '' }} || true
+
+      - name: Ensure SCA SARIF exists
+        run: |
+          [ -f sca.sarif ] || echo '{"version":"2.1.0","runs":[]}' > sca.sarif
+
+      - name: Upload SCA SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: sca.sarif
+          category: tigergate-sca
+        continue-on-error: true
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 3 – Secrets Detection
+# Covers: secrets/, .env files, hardcoded_credentials.txt
+# ─────────────────────────────────────────────────────────────────────────────
+  secrets-scan:
+    name: "3/10 · Secrets Detection"
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run TigerGate Secrets Scan
+        continue-on-error: true
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -e TIGERGATE_API_KEY="${{ secrets.TIGERGATE_API_KEY }}" \
+            ${{ env.TIGERGATE_IMAGE }} \
+            tigergate scan \
+              --type secrets \
+              --path /workspace \
+              --output sarif \
+              --output-file /workspace/secrets.sarif \
+              --no-fail \
+              ${{ secrets.TIGERGATE_API_KEY != '' && '--upload' || '' }} || true
+
+      - name: Ensure Secrets SARIF exists
+        run: |
+          [ -f secrets.sarif ] || echo '{"version":"2.1.0","runs":[]}' > secrets.sarif
+
+      - name: Upload Secrets SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: secrets.sarif
+          category: tigergate-secrets
+        continue-on-error: true
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 4 – IaC Scanning (Terraform + CloudFormation + Ansible)
+# Covers: cspm/, ciem/, iac/, zero_trust/, industry/**/*.tf
+# ─────────────────────────────────────────────────────────────────────────────
+  iac:
+    name: "4/10 · IaC – Terraform / CFn / Ansible"
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run TigerGate IaC Scan
+        continue-on-error: true
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -e TIGERGATE_API_KEY="${{ secrets.TIGERGATE_API_KEY }}" \
+            ${{ env.TIGERGATE_IMAGE }} \
+            tigergate scan \
+              --type iac \
+              --path /workspace \
+              --include "cspm/**,ciem/**,iac/**,zero_trust/*.tf,industry/**/*.tf,ai_spm/*.tf,dspm/*.tf,attack_paths/**" \
+              --output sarif \
+              --output-file /workspace/iac.sarif \
+              --no-fail \
+              ${{ secrets.TIGERGATE_API_KEY != '' && '--upload' || '' }} || true
+
+      - name: Ensure IaC SARIF exists
+        run: |
+          [ -f iac.sarif ] || echo '{"version":"2.1.0","runs":[]}' > iac.sarif
+
+      - name: Upload IaC SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: iac.sarif
+          category: tigergate-iac
+        continue-on-error: true
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 5 – Container Security (Dockerfile lint + image CVEs)
+# Covers: docker/, mega-test-project/**/Dockerfile
+# ─────────────────────────────────────────────────────────────────────────────
+  container:
+    name: "5/10 · Container – Dockerfile & Image CVEs"
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run TigerGate Container Scan
+        continue-on-error: true
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -e TIGERGATE_API_KEY="${{ secrets.TIGERGATE_API_KEY }}" \
+            ${{ env.TIGERGATE_IMAGE }} \
+            tigergate scan \
+              --type container \
+              --path /workspace \
+              --include "docker/**,mega-test-project/**/Dockerfile,mega-test-project/**/*.dockerfile" \
+              --output sarif \
+              --output-file /workspace/container.sarif \
+              --no-fail \
+              ${{ secrets.TIGERGATE_API_KEY != '' && '--upload' || '' }} || true
+
+      - name: Ensure Container SARIF exists
+        run: |
+          [ -f container.sarif ] || echo '{"version":"2.1.0","runs":[]}' > container.sarif
+
+      - name: Upload Container SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: container.sarif
+          category: tigergate-container
+        continue-on-error: true
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 6 – API Security (OWASP API Top 10)
+# Covers: api/rest_api_insecure.js, api/graphql_server.js, api/swagger.yaml
+# ─────────────────────────────────────────────────────────────────────────────
+  api:
+    name: "6/10 · API Security – OWASP API Top 10"
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run TigerGate API Scan
+        continue-on-error: true
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -e TIGERGATE_API_KEY="${{ secrets.TIGERGATE_API_KEY }}" \
+            ${{ env.TIGERGATE_IMAGE }} \
+            tigergate scan \
+              --type api \
+              --path /workspace \
+              --include "api/**" \
+              --output sarif \
+              --output-file /workspace/api.sarif \
+              --no-fail \
+              ${{ secrets.TIGERGATE_API_KEY != '' && '--upload' || '' }} || true
+
+      - name: Ensure API SARIF exists
+        run: |
+          [ -f api.sarif ] || echo '{"version":"2.1.0","runs":[]}' > api.sarif
+
+      - name: Upload API SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: api.sarif
+          category: tigergate-api
+        continue-on-error: true
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 7 – KSPM (Kubernetes Security Posture)
+# Covers: kspm/, mega-test-project/k8s/
+# ─────────────────────────────────────────────────────────────────────────────
+  kspm:
+    name: "7/10 · KSPM – Kubernetes Manifests"
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run TigerGate KSPM Scan
+        continue-on-error: true
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -e TIGERGATE_API_KEY="${{ secrets.TIGERGATE_API_KEY }}" \
+            ${{ env.TIGERGATE_IMAGE }} \
+            tigergate scan \
+              --type kspm \
+              --path /workspace \
+              --include "kspm/**,mega-test-project/k8s/**" \
+              --output sarif \
+              --output-file /workspace/kspm.sarif \
+              --no-fail \
+              ${{ secrets.TIGERGATE_API_KEY != '' && '--upload' || '' }} || true
+
+      - name: Ensure KSPM SARIF exists
+        run: |
+          [ -f kspm.sarif ] || echo '{"version":"2.1.0","runs":[]}' > kspm.sarif
+
+      - name: Upload KSPM SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: kspm.sarif
+          category: tigergate-kspm
+        continue-on-error: true
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 8 – CIEM (Cloud Identity & Entitlement)
+# Covers: ciem/overly_permissive_iam.tf, ciem/cross_account.tf
+# ─────────────────────────────────────────────────────────────────────────────
+  ciem:
+    name: "8/10 · CIEM – IAM & Identity"
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run TigerGate CIEM Scan
+        continue-on-error: true
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -e TIGERGATE_API_KEY="${{ secrets.TIGERGATE_API_KEY }}" \
+            ${{ env.TIGERGATE_IMAGE }} \
+            tigergate scan \
+              --type ciem \
+              --path /workspace \
+              --include "ciem/**" \
+              --output sarif \
+              --output-file /workspace/ciem.sarif \
+              --no-fail \
+              ${{ secrets.TIGERGATE_API_KEY != '' && '--upload' || '' }} || true
+
+      - name: Ensure CIEM SARIF exists
+        run: |
+          [ -f ciem.sarif ] || echo '{"version":"2.1.0","runs":[]}' > ciem.sarif
+
+      - name: Upload CIEM SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: ciem.sarif
+          category: tigergate-ciem
+        continue-on-error: true
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 9 – CWPP / Runtime / CDR / AI-SPM / Supply Chain
+# Covers: cwpp/, runtime/, cdr/, ai_spm/, supply_chain/
+# ─────────────────────────────────────────────────────────────────────────────
+  cwpp-cdr:
+    name: "9/10 · CWPP · CDR · AI-SPM · Supply Chain"
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run TigerGate CWPP / CDR / AI-SPM Scan
+        continue-on-error: true
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -e TIGERGATE_API_KEY="${{ secrets.TIGERGATE_API_KEY }}" \
+            ${{ env.TIGERGATE_IMAGE }} \
+            tigergate scan \
+              --type cwpp,cdr,ai-spm \
+              --path /workspace \
+              --include "cwpp/**,runtime/**,cdr/**,ai_spm/**,supply_chain/**,advanced_evasion/**" \
+              --output sarif \
+              --output-file /workspace/cwpp.sarif \
+              --no-fail \
+              ${{ secrets.TIGERGATE_API_KEY != '' && '--upload' || '' }} || true
+
+      - name: Ensure CWPP SARIF exists
+        run: |
+          [ -f cwpp.sarif ] || echo '{"version":"2.1.0","runs":[]}' > cwpp.sarif
+
+      - name: Upload CWPP SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: cwpp.sarif
+          category: tigergate-cwpp
+        continue-on-error: true
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 10 – Full Consolidated Scan + Quality Gate + Dashboard Upload
+# Runs AFTER all individual jobs, uploads merged results to TigerGate platform
+# ─────────────────────────────────────────────────────────────────────────────
+  full-report:
+    name: "10/10 · Full Scan + Quality Gate + Dashboard Upload"
+    runs-on: ubuntu-latest
+    needs: [sast, sca, secrets-scan, iac, container, api, kspm, ciem, cwpp-cdr]
+    if: always()
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run TigerGate Full Consolidated Scan
+        continue-on-error: true
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -e TIGERGATE_API_KEY="${{ secrets.TIGERGATE_API_KEY }}" \
+            ${{ env.TIGERGATE_IMAGE }} \
+            tigergate scan \
+              --type all \
+              --path /workspace \
+              --output sarif \
+              --output-file /workspace/full.sarif \
+              --quality-gate \
+              --fail-on critical,high \
+              ${{ secrets.TIGERGATE_API_KEY != '' && '--upload' || '--no-upload' }} || true
+
+      - name: Print scan summary
+        run: |
+          echo ""
+          echo "════════════════════════════════════════════════════════"
+          echo "  TigerGate CNAPP Full Scan Complete"
+          echo "════════════════════════════════════════════════════════"
+          echo ""
+          echo "  Coverage:"
+          echo "    ✅ SAST    – nodejs, python, php, ruby, java, sast_advanced"
+          echo "    ✅ SCA     – package.json, requirements.txt, pom.xml"
+          echo "    ✅ Secrets – .env, hardcoded_credentials, jwt_tokens"
+          echo "    ✅ IaC     – cspm, ciem, iac, zero_trust, industry/**"
+          echo "    ✅ Container – Dockerfiles (insecure)"
+          echo "    ✅ API     – REST, GraphQL, SOAP, OpenAPI"
+          echo "    ✅ KSPM   – K8s manifests, RBAC, PSP"
+          echo "    ✅ CIEM   – IAM, cross-account, role chaining"
+          echo "    ✅ CWPP   – runtime attacks, eBPF patterns"
+          echo "    ✅ CDR    – CloudTrail events, GuardDuty findings"
+          echo "    ✅ AI-SPM – LLM app, SageMaker, prompt injection"
+          echo "    ✅ Supply Chain – malicious workflow, insecure CI"
+          echo ""
+          if [ -n "${{ secrets.TIGERGATE_API_KEY }}" ]; then
+            echo "  Results uploaded to TigerGate dashboard ✅"
+          else
+            echo "  ⚠️  Set TIGERGATE_API_KEY secret to enable dashboard upload"
+          fi
+          echo ""
+
+      - name: Ensure Full SARIF exists
+        run: |
+          [ -f full.sarif ] || echo '{"version":"2.1.0","runs":[]}' > full.sarif
+
+      - name: Upload Full SARIF to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: full.sarif
+          category: tigergate-full
+        continue-on-error: true

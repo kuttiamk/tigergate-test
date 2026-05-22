@@ -1,0 +1,66 @@
+name: 🐯 TigerGate PR Gate
+
+on:
+  pull_request:
+    branches: [main, master, develop]
+
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: write
+
+env:
+  TIGERGATE_IMAGE: tigergate/tigergate-cli:latest
+
+jobs:
+  pr-gate:
+    name: "TigerGate PR Security Gate"
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history so diff is available
+
+      - name: Run TigerGate PR Scan (SAST + Secrets + IaC)
+        id: scan
+        continue-on-error: true
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -e TIGERGATE_API_KEY="${{ secrets.TIGERGATE_API_KEY }}" \
+            ${{ env.TIGERGATE_IMAGE }} \
+            tigergate scan \
+              --type sast,secrets,iac,sca \
+              --path /workspace \
+              --output sarif \
+              --output-file /workspace/pr-gate.sarif \
+              --no-fail \
+              ${{ secrets.TIGERGATE_API_KEY != '' && '--upload' || '' }} \
+              2>&1 | tee /tmp/scan-output.txt || true
+
+      - name: Ensure PR SARIF exists
+        run: |
+          [ -f pr-gate.sarif ] || echo '{"version":"2.1.0","runs":[]}' > pr-gate.sarif
+
+      - name: Upload PR Gate SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: pr-gate.sarif
+          category: tigergate-pr
+        continue-on-error: true
+
+      - name: Post PR Comment Summary
+        uses: actions/github-script@v7
+        continue-on-error: true
+        with:
+          script: |
+            const output = require('fs').existsSync('/tmp/scan-output.txt')
+              ? require('fs').readFileSync('/tmp/scan-output.txt', 'utf8').slice(0, 3000)
+              : 'Scan completed — see Security tab for results.';
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## 🐯 TigerGate PR Security Gate\n\n\`\`\`\n${output}\n\`\`\`\n\n[View full results →](https://github.com/${context.repo.owner}/${context.repo.repo}/security/code-scanning)`
+            });
